@@ -165,7 +165,7 @@ $page_title = "Author Dashboard";
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title><?php echo $page_title; ?> - Stand Blog</title>
+    <title><?php echo $page_title; ?> - NetPy Blog</title>
 
     <!-- Bootstrap & Core CSS -->
     <link href="../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
@@ -379,6 +379,28 @@ $page_title = "Author Dashboard";
                             <div class="stats-box">
                                 <h3>Featured Posts</h3>
                                 <div class="h4"><?php echo $stats['featured_posts']; ?></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- After the existing statistics cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Category Management</h5>
+                                    <p class="card-text">Create and manage categories for your blog posts.</p>
+                                    <a href="manage-categories.php" class="btn btn-primary">Manage Categories</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Tag Management</h5>
+                                    <p class="card-text">Create and manage tags to organize your content.</p>
+                                    <a href="manage-tags.php" class="btn btn-primary">Manage Tags</a>
+                                </div>
                             </div>
                         </div>
                     </div>

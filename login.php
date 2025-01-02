@@ -31,7 +31,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role'];
             
-            // Redirect admin to dashboard, others to home
+            // Check if there's a return URL
+            if (isset($_GET['return_url'])) {
+                $return_url = $_GET['return_url'];
+                // Validate the return URL to ensure it's a local URL
+                if (strpos($return_url, '/') === 0) {
+                    header('Location: ' . $return_url);
+                    exit;
+                }
+            }
+            
+            // If no return URL or invalid, redirect to default location
             if ($user['role'] === 'admin') {
                 header('Location: admin/dashboard.php');
             } else {
@@ -50,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Login - Stand Blog</title>
+    <title>Login - NetPy Blog</title>
     <link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i&display=swap" rel="stylesheet">
     <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/fontawesome.css">
@@ -143,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <?php echo $error; ?>
                                     </div>
                                 <?php endif; ?>
-                                <form action="login.php" method="post">
+                                <form action="login.php<?php echo isset($_GET['return_url']) ? '?return_url=' . urlencode($_GET['return_url']) : ''; ?>" method="post">
                                     <div class="row">
                                         <div class="col-md-12">
                                             <fieldset>
@@ -169,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </form>
                                 <div class="signup-link">
                                     Don't have an account? 
-                                    <a href="signup.php" class="signup-button">Sign Up</a>
+                                    <a href="signup.php<?php echo isset($_GET['return_url']) ? '?return_url=' . urlencode($_GET['return_url']) : ''; ?>" class="signup-button">Sign Up</a>
                                 </div>
                             </div>
                         </div>

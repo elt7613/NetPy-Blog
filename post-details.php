@@ -80,7 +80,7 @@ function displayComment($comment, $comment_replies, $level = 0) {
                     <?php if (!empty($comment['avatar'])): ?>
                         <img src="<?php echo htmlspecialchars($comment['avatar']); ?>" alt="<?php echo htmlspecialchars($comment['username']); ?>">
                     <?php else: ?>
-                        <img src="assets/images/deffault-profile-img.png" alt="Default profile">
+                        <img src="assets/images/default-profile.png" alt="Default profile">
                     <?php endif; ?>
                 </div>
                 <div class="comment-content flex-grow-1">
@@ -197,14 +197,25 @@ $categories = getAllCategories();
             padding: 8px 20px;
             color: #333;
             font-size: 14px;
+            transition: all 0.3s ease;
         }
         .share-menu .dropdown-item i {
             width: 25px;
             text-align: center;
+            color: #333;
+            transition: all 0.3s ease;
         }
-        .share-menu .dropdown-item:hover {
+        .share-menu .dropdown-item:hover,
+        .share-menu .dropdown-item:focus,
+        .share-menu .dropdown-item:active {
             background-color: #f48840;
-            color: #fff;
+            color: #fff !important;
+            text-decoration: none;
+        }
+        .share-menu .dropdown-item:hover i,
+        .share-menu .dropdown-item:focus i,
+        .share-menu .dropdown-item:active i {
+            color: #fff !important;
         }
         .share-menu .dropdown-divider {
             margin: 5px 0;
@@ -416,6 +427,135 @@ $categories = getAllCategories();
             display: flex;
             align-items: center;
         }
+        .post-content p {
+            border: none !important;
+            padding: 0 !important;
+            margin-bottom: 1rem;
+            color: #181818;
+        }
+        .post-content {
+            color: #181818;
+        }
+        .post-content * {
+            color: #181818;
+        }
+        .post-content p:after {
+            display: none !important;
+        }
+        .post-info li a {
+            color: #484848 !important;
+        }
+        .post-info li:after {
+            color: #484848;
+        }
+        .comment-content p {
+            color: #2b2b2b;
+        }
+        .comment-content {
+            color: #2b2b2b;
+        }
+        .sidebar-item.comments .content p {
+            color: #2b2b2b;
+        }
+        .replies-container p {
+            color: #2b2b2b;
+        }
+        .sidebar-item p {
+            color: #484848;
+        }
+        .text-muted {
+            color: #666666 !important;
+        }
+        .down-content span {
+            color: #484848;
+        }
+        .post-tags li a {
+            color: #484848;
+        }
+        .sidebar-item .content p {
+            color: #484848;
+        }
+        .comment-header h4 {
+            color: #f48840;
+        }
+        .comment-header .text-muted {
+            font-size: 12px;
+        }
+        .comment-header div h4 {
+            margin-bottom: 2px;
+        }
+        .post-info li a:hover,
+        .post-tags li a:hover {
+            color: #f48840 !important;
+        }
+        /* Make horizontal lines black */
+        .down-content {
+            border-bottom: 1px solid #dddddd;
+        }
+        .post-options {
+            border-top: 1px solid #dddddd;
+        }
+        .sidebar-item {
+            border-bottom: 1px solid #dddddd;
+        }
+        .dropdown-divider {
+            border-top: 1px solid #dddddd;
+        }
+        .comment-content {
+            border: 1px solid #dddddd;
+        }
+        /* Share dropdown styles */
+        .post-share .dropdown-toggle::after {
+            display: none;
+        }
+        .post-share .nav-link {
+            padding: 0;
+            color: #353935;
+        }
+        .post-share li {
+            color: #353935;
+        }
+        .post-tags li {
+            color: #353935;
+        }
+        .post-tags li a {
+            color: #353935 !important;
+        }
+        .post-share li a {
+            color: #353935 !important;
+        }
+        /* Keep hover color */
+        .post-share .nav-link:hover,
+        .post-tags li a:hover,
+        .post-share li a:hover {
+            color: #f48840 !important;
+            text-decoration: none;
+        }
+        .share-menu {
+            min-width: 200px;
+            padding: 10px 0;
+            margin-top: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        /* Tag cloud colors */
+        .tagcloud li a {
+            color: #353935 !important;
+        }
+        .tagcloud li a:hover {
+            color: #f48840 !important;
+        }
+        /* Category list colors in sidebar */
+        .categories li a {
+            color: #353935 !important;
+        }
+        .categories li a:hover {
+            color: #f48840 !important;
+        }
+        /* Post count in categories and tags */
+        .categories li span,
+        .tagcloud li span {
+            color: #353935;
+        }
     </style>
 </head>
 
@@ -439,11 +579,11 @@ $categories = getAllCategories();
     <!-- Page Content -->
     <!-- Banner Starts Here -->
     <div class="heading-page header-text">
-        <section class="page-heading">
+        <section class="page-heading" <?php if (!empty($post['image_path'])): ?> style="background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('<?php echo htmlspecialchars($post['image_path']); ?>'); background-size: cover; background-position: center;" <?php endif; ?>>
             <div class="container">
                 <div class="row">
                     <div class="col-lg-12">
-                        <div class="text-content">
+                        <div class="text-content" style="color: #fff;">
                             <h4><?php echo htmlspecialchars($post['category_name']); ?></h4>
                             <h2><?php echo htmlspecialchars($post['title']); ?></h2>
                         </div>
@@ -512,8 +652,8 @@ $categories = getAllCategories();
                                                 <div class="col-6">
                                                     <ul class="post-share">
                                                         <li><i class="fa fa-share-alt"></i></li>
-                                                        <li class="dropdown">
-                                                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                                                        <li class="nav-item dropdown">
+                                                            <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
                                                                 Share
                                                             </a>
                                                             <div class="dropdown-menu dropdown-menu-right share-menu">
@@ -598,7 +738,7 @@ $categories = getAllCategories();
                                 <?php else: ?>
                                     <div class="sidebar-item">
                                         <div class="content">
-                                            <p><a href="login.php">Login</a> to leave a comment.</p>
+                                            <p><a href="login.php?return_url=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>">Login</a> to leave a comment.</p>
                                         </div>
                                     </div>
                                 <?php endif; ?>
@@ -629,6 +769,9 @@ $categories = getAllCategories();
 
     <script>
         $(document).ready(function() {
+            // Initialize Bootstrap dropdowns
+            $('.dropdown-toggle').dropdown();
+
             // Handle copy link
             $('.copy-link').click(function(e) {
                 e.preventDefault();
@@ -647,11 +790,9 @@ $categories = getAllCategories();
                 $('.copy-success').fadeIn().delay(2000).fadeOut();
             });
 
-            // Close dropdown when clicking outside
-            $(document).click(function(e) {
-                if (!$(e.target).closest('.dropdown').length) {
-                    $('.share-menu').removeClass('show');
-                }
+            // Prevent dropdown from closing when clicking inside
+            $('.share-menu').on('click', function(e) {
+                e.stopPropagation();
             });
         });
 

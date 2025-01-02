@@ -93,20 +93,21 @@ $tags = getAllTags();
                         .sidebar-item .tags ul.tags li a {
                             display: inline-block;
                             padding: 5px 12px;
-                            background: #f48840;
-                            color: #fff;
+                            background: #f8f9fa;
+                            color: #353935;
                             border-radius: 20px;
                             font-size: 14px;
                             transition: all 0.3s;
                         }
                         .sidebar-item .tags ul.tags li a:hover {
-                            background: #fb9857;
+                            background: #f48840;
+                            color: #fff;
                             transform: translateY(-2px);
                         }
-                        .sidebar-item .tags ul.tags li a.tag-1 { font-size: 12px; opacity: 0.8; }
-                        .sidebar-item .tags ul.tags li a.tag-2 { font-size: 14px; opacity: 0.85; }
-                        .sidebar-item .tags ul.tags li a.tag-3 { font-size: 16px; opacity: 0.9; }
-                        .sidebar-item .tags ul.tags li a.tag-4 { font-size: 18px; opacity: 0.95; }
+                        .sidebar-item .tags ul.tags li a.tag-1 { font-size: 12px; opacity: 0.85; }
+                        .sidebar-item .tags ul.tags li a.tag-2 { font-size: 14px; opacity: 0.9; }
+                        .sidebar-item .tags ul.tags li a.tag-3 { font-size: 16px; opacity: 0.95; }
+                        .sidebar-item .tags ul.tags li a.tag-4 { font-size: 18px; opacity: 1; }
                         .sidebar-item .tags ul.tags li a.tag-5 { font-size: 20px; opacity: 1; }
                     </style>
                 </div>

@@ -12,7 +12,7 @@ if (!isLoggedIn() || !isAdmin()) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         if ($_POST['action'] === 'add' && !empty($_POST['name'])) {
-            $name = sanitizeInput($_POST['name']);
+            $name = html_entity_decode(sanitizeInput($_POST['name']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
             $slug = createSlug($name);
             
             $sql = "INSERT INTO categories (name, slug) VALUES (?, ?)";
@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         elseif ($_POST['action'] === 'edit' && !empty($_POST['category_id']) && !empty($_POST['name'])) {
             $category_id = (int)$_POST['category_id'];
-            $name = sanitizeInput($_POST['name']);
+            $name = html_entity_decode(sanitizeInput($_POST['name']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
             $slug = createSlug($name);
             
             $sql = "UPDATE categories SET name = ?, slug = ? WHERE id = ?";
@@ -66,7 +66,7 @@ $categories = $result->fetch_all(MYSQLI_ASSOC);
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Manage Categories - Stand Blog</title>
+    <title>Manage Categories - NetPy Blog</title>
     <link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i&display=swap" rel="stylesheet">
     <link href="../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/fontawesome.css">
@@ -151,13 +151,13 @@ $categories = $result->fetch_all(MYSQLI_ASSOC);
                                             <tr>
                                                 <td>
                                                     <span class="category-name" data-id="<?php echo $category['id']; ?>">
-                                                        <?php echo htmlspecialchars($category['name']); ?>
+                                                        <?php echo $category['name']; ?>
                                                     </span>
                                                     <form action="manage-categories.php" method="post" class="edit-form" style="display: none;">
                                                         <input type="hidden" name="action" value="edit">
                                                         <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
                                                         <div class="input-group">
-                                                            <input type="text" name="name" value="<?php echo htmlspecialchars($category['name']); ?>" class="form-control">
+                                                            <input type="text" name="name" value="<?php echo $category['name']; ?>" class="form-control">
                                                             <div class="input-group-append">
                                                                 <button type="submit" class="btn btn-success btn-sm">Save</button>
                                                                 <button type="button" class="btn btn-secondary btn-sm cancel-edit">Cancel</button>

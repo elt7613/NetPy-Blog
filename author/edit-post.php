@@ -134,7 +134,7 @@ $page_title = "Edit Post";
     <meta name="author" content="">
     <link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i&display=swap" rel="stylesheet">
 
-    <title>Edit Post - Stand Blog</title>
+    <title>Edit Post - NetPy Blog</title>
 
     <!-- Bootstrap core CSS -->
     <link href="../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
@@ -366,6 +366,10 @@ $page_title = "Edit Post";
                                         <div class="col-lg-12">
                                             <fieldset>
                                                 <button type="submit" id="form-submit" class="main-button">Update Post</button>
+                                                <form action="delete-post.php" method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this post? This action cannot be undone.');">
+                                                    <input type="hidden" name="post_id" value="<?php echo $post_id; ?>">
+                                                    <button type="submit" class="btn btn-danger">Delete Post</button>
+                                                </form>
                                             </fieldset>
                                         </div>
                                     </div>

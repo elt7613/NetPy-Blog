@@ -11,7 +11,7 @@ $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Stand Blog</title>
+    <title>NetPy Blog</title>
 
     <!-- Bootstrap core CSS -->
     <link href="<?php echo $base_url; ?>vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">

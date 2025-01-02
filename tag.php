@@ -73,7 +73,7 @@ $categories = getAllCategories();
     <meta name="description" content="Posts tagged with <?php echo htmlspecialchars($tag['name']); ?>">
     <link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i&display=swap" rel="stylesheet">
 
-    <title>Posts tagged with <?php echo htmlspecialchars($tag['name']); ?> - Stand Blog</title>
+    <title>Posts tagged with <?php echo htmlspecialchars($tag['name']); ?> - NetPy Blog</title>
 
     <!-- Bootstrap core CSS -->
     <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">

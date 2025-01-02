@@ -4,6 +4,15 @@ require_once 'functions.php';
 
 // Redirect if already logged in
 if (isLoggedIn()) {
+    // Check if there's a return URL
+    if (isset($_GET['return_url'])) {
+        $return_url = $_GET['return_url'];
+        // Validate the return URL to ensure it's a local URL
+        if (strpos($return_url, '/') === 0) {
+            header('Location: ' . $return_url);
+            exit;
+        }
+    }
     header('Location: index.php');
     exit;
 }
@@ -44,6 +53,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user_id'] = $stmt->insert_id;
                 $_SESSION['username'] = $username;
                 $_SESSION['role'] = $role;
+                
+                // Check if there's a return URL
+                if (isset($_GET['return_url'])) {
+                    $return_url = $_GET['return_url'];
+                    // Validate the return URL to ensure it's a local URL
+                    if (strpos($return_url, '/') === 0) {
+                        header('Location: ' . $return_url);
+                        exit;
+                    }
+                }
+                
                 header('Location: index.php');
                 exit;
             } else {
@@ -59,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Sign Up - Stand Blog</title>
+    <title>Sign Up - NetPy Blog</title>
     <link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i&display=swap" rel="stylesheet">
     <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/fontawesome.css">
@@ -133,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <?php echo $error; ?>
                                     </div>
                                 <?php endif; ?>
-                                <form action="signup.php" method="post">
+                                <form action="signup.php<?php echo isset($_GET['return_url']) ? '?return_url=' . urlencode($_GET['return_url']) : ''; ?>" method="post">
                                     <div class="row">
                                         <div class="col-md-6">
                                             <fieldset>
@@ -173,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     </div>
                                 </form>
                                 <div class="login-link">
-                                    Already have an account? <a href="login.php">Login here</a>
+                                    Already have an account? <a href="login.php<?php echo isset($_GET['return_url']) ? '?return_url=' . urlencode($_GET['return_url']) : ''; ?>">Login here</a>
                                 </div>
                             </div>
                         </div>
