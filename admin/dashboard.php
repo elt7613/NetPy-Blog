@@ -187,14 +187,13 @@ $draft_posts = $conn->query($draft_posts_sql)->fetch_assoc()['total'];
 $total_comments_sql = "SELECT COUNT(*) as total FROM comments";
 $total_comments = $conn->query($total_comments_sql)->fetch_assoc()['total'];
 
-// Get recent posts
-$recent_posts_sql = "SELECT p.*, c.name as category_name, u.username as author_name 
-                     FROM posts p 
-                     LEFT JOIN categories c ON p.category_id = c.id 
-                     LEFT JOIN users u ON p.author_id = u.id 
-                     ORDER BY p.created_at DESC 
-                     LIMIT 10";
-$recent_posts = $conn->query($recent_posts_sql)->fetch_all(MYSQLI_ASSOC);
+// Get newsletter subscribers count
+$newsletter_count_sql = "SELECT COUNT(*) as total FROM netpy_newsletter_users";
+$total_subscribers = $conn->query($newsletter_count_sql)->fetch_assoc()['total'];
+
+// Get recent newsletter subscribers
+$recent_subscribers_sql = "SELECT * FROM netpy_newsletter_users ORDER BY subscribed_at DESC LIMIT 10";
+$recent_subscribers = $conn->query($recent_subscribers_sql)->fetch_all(MYSQLI_ASSOC);
 
 // Get recent comments
 $recent_comments_sql = "SELECT c.*, p.title as post_title, u.username 
@@ -274,6 +273,7 @@ include '../includes/header.php';
                         <a href="manage-users.php" class="btn btn-info">Manage Users</a>
                         <a href="manage-categories.php" class="btn btn-success">Manage Categories</a>
                         <a href="manage-tags.php" class="btn btn-secondary">Manage Tags</a>
+                        <a href="manage-newsletter.php" class="btn btn-warning">Manage Newsletter</a>
                         <a href="settings.php" class="btn btn-dark">Settings</a>
                     </div>
 
@@ -313,6 +313,35 @@ include '../includes/header.php';
                                     Users: <?php echo $user_stats['normal_users']; ?>
                                 </small>
                             </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stats-box">
+                                <h3>Newsletter</h3>
+                                <p>Total Subscribers: <?php echo $total_subscribers; ?></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Newsletter Subscribers Section -->
+                    <div class="stats-box mt-4">
+                        <h3>Recent Newsletter Subscribers</h3>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Email</th>
+                                        <th>Subscribed Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($recent_subscribers as $subscriber): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($subscriber['email']); ?></td>
+                                        <td><?php echo date('M d, Y H:i', strtotime($subscriber['subscribed_at'])); ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 

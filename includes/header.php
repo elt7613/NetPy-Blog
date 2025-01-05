@@ -40,7 +40,7 @@ $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
             width: 40px;
             height: 40px;
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #f48840;
+            border-top: 4px solid #0047cc;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -76,7 +76,10 @@ $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
                 <div class="collapse navbar-collapse" id="navbarResponsive">
                     <ul class="navbar-nav ml-auto">
                         <li class="nav-item">
-                            <a class="nav-link" href="<?php echo $base_url; ?>index.php">Home</a>
+                            <a class="nav-link" href="https://netpy.in/" target="_blank">Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?php echo $base_url; ?>index.php">Blogs</a>
                         </li>
                         <?php if (isLoggedIn()): ?>
                             <?php if (isAdmin()): ?>
@@ -133,4 +136,37 @@ $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
     <script src="<?php echo $base_url; ?>assets/js/owl.js"></script>
     <script src="<?php echo $base_url; ?>assets/js/slick.js"></script>
     <script src="<?php echo $base_url; ?>assets/js/isotope.js"></script>
-    <script src="<?php echo $base_url; ?>assets/js/accordions.js"></script> 
+    <script src="<?php echo $base_url; ?>assets/js/accordions.js"></script>
+    
+    <script>
+        $(document).ready(function() {
+            // Improved toggle button handling
+            $('.navbar-toggler').on('click', function(event) {
+                event.stopPropagation(); // Prevent event from bubbling up
+                var $navbar = $('.navbar-collapse');
+                if ($navbar.hasClass('show')) {
+                    $navbar.collapse('hide');
+                } else {
+                    $navbar.collapse('show');
+                }
+            });
+
+            // Close menu when clicking outside
+            $(document).on('click', function(event) {
+                var $navbar = $('.navbar-collapse');
+                if ($navbar.hasClass('show') && !$(event.target).closest('.navbar').length) {
+                    $navbar.collapse('hide');
+                }
+            });
+
+            // Close menu when clicking on a nav link (for mobile)
+            $('.nav-link').on('click', function() {
+                var $navbar = $('.navbar-collapse');
+                if ($navbar.hasClass('show')) {
+                    $navbar.collapse('hide');
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

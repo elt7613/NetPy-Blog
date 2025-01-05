@@ -10,18 +10,18 @@ if (isLoggedIn()) {
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = sanitizeInput($_POST['username']);
+    $email = sanitizeInput($_POST['email']);
     $password = $_POST['password'];
     $error = null;
     
     // Validate input
-    if (empty($username) || empty($password)) {
+    if (empty($email) || empty($password)) {
         $error = "All fields are required.";
     } else {
         // Check credentials
-        $sql = "SELECT * FROM users WHERE username = ?";
+        $sql = "SELECT * FROM users WHERE email = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("s", $username);
+        $stmt->bind_param("s", $email);
         $stmt->execute();
         $user = $stmt->get_result()->fetch_assoc();
         
@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
             margin-top: 15px;
             padding: 10px;
-            background-color: #f48840;
+            background-color: #0047cc;
             color: #fff !important;
             border: none;
             border-radius: 5px;
@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 500;
         }
         .signup-button:hover {
-            background-color: #fb9857;
+            background-color: #1a5edb;
             color: #fff !important;
             text-decoration: none;
         }
@@ -157,8 +157,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <div class="row">
                                         <div class="col-md-12">
                                             <fieldset>
-                                                <label>Username</label>
-                                                <input name="username" type="text" value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>" required>
+                                                <label>Email</label>
+                                                <input name="email" type="email" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required>
                                             </fieldset>
                                         </div>
                                         <div class="col-md-12">

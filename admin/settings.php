@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($_POST['action'] === 'update_profile') {
             $username = isset($_POST['username']) ? sanitizeInput($_POST['username']) : '';
             $email = isset($_POST['email']) ? sanitizeInput($_POST['email']) : '';
+            $phone_number = !empty($_POST['phone_number']) ? sanitizeInput($_POST['phone_number']) : null;
             
             // Check if username is already taken by another user
             $sql = "SELECT id FROM users WHERE username = ? AND id != ?";
@@ -32,9 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->get_result()->num_rows > 0) {
                 $profile_error = "Username is already taken.";
             } else {
-                $sql = "UPDATE users SET username = ?, email = ? WHERE id = ?";
+                $sql = "UPDATE users SET username = ?, email = ?, phone_number = ? WHERE id = ?";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ssi", $username, $email, $user_id);
+                $stmt->bind_param("sssi", $username, $email, $phone_number, $user_id);
                 if ($stmt->execute()) {
                     $_SESSION['username'] = $username; // Update session username
                     $profile_success = "Profile updated successfully.";
@@ -251,9 +252,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <!-- Profile Information -->
                         <div class="sidebar-item contact-form settings-section">
                             <div class="sidebar-heading">
-                                <h2>Profile Information</h2>
+                                <h2>Profile Settings</h2>
                             </div>
                             <div class="content">
+                                <?php if (isset($profile_success)): ?>
+                                    <div class="alert alert-success">
+                                        <?php echo $profile_success; ?>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (isset($profile_error)): ?>
+                                    <div class="alert alert-danger">
+                                        <?php echo $profile_error; ?>
+                                    </div>
+                                <?php endif; ?>
                                 <form action="settings.php" method="post">
                                     <input type="hidden" name="action" value="update_profile">
                                     <div class="row">
@@ -267,6 +278,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                             <fieldset>
                                                 <label>Email</label>
                                                 <input name="email" type="email" value="<?php echo htmlspecialchars($user['email']); ?>" required>
+                                            </fieldset>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <fieldset>
+                                                <label>Phone Number (Optional)</label>
+                                                <input name="phone_number" type="tel" value="<?php echo htmlspecialchars($user['phone_number'] ?? ''); ?>">
                                             </fieldset>
                                         </div>
                                         <div class="col-lg-12">

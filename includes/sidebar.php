@@ -98,11 +98,15 @@ $tags = getAllTags();
                             border-radius: 20px;
                             font-size: 14px;
                             transition: all 0.3s;
+                            text-decoration: none !important;
                         }
-                        .sidebar-item .tags ul.tags li a:hover {
-                            background: #f48840;
-                            color: #fff;
+                        body .sidebar-item .tags ul.tags li a:hover,
+                        .sidebar-item .tags ul.tags li a:hover,
+                        .sidebar .sidebar-item .tags ul.tags li a:hover {
+                            background-color: #f48840 !important;
+                            color: #ffffff !important;
                             transform: translateY(-2px);
+                            text-decoration: none !important;
                         }
                         .sidebar-item .tags ul.tags li a.tag-1 { font-size: 12px; opacity: 0.85; }
                         .sidebar-item .tags ul.tags li a.tag-2 { font-size: 14px; opacity: 0.9; }

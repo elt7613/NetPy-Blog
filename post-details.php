@@ -33,11 +33,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_comment']) && 
     exit;
 }
 
-// Update view count
-$sql = "UPDATE posts SET views = views + 1 WHERE slug = ?";
+// Get visitor's IP address
+$ip_address = $_SERVER['REMOTE_ADDR'];
+
+// Check if this IP has viewed this post in the last hour
+$sql = "SELECT id FROM post_views 
+        WHERE post_id = ? 
+        AND ip_address = ? 
+        AND viewed_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)";
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("s", $slug);
+$stmt->bind_param("is", $post['id'], $ip_address);
 $stmt->execute();
+$result = $stmt->get_result();
+
+// If no recent view from this IP, add view count
+if ($result->num_rows === 0) {
+    // Begin transaction
+    $conn->begin_transaction();
+    
+    try {
+        // Insert view record
+        $sql = "INSERT INTO post_views (post_id, ip_address) VALUES (?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("is", $post['id'], $ip_address);
+        $stmt->execute();
+        
+        // Update post view count
+        $sql = "UPDATE posts SET views = views + 1 WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("i", $post['id']);
+        $stmt->execute();
+        
+        // Commit transaction
+        $conn->commit();
+    } catch (Exception $e) {
+        // If there's an error, rollback changes
+        $conn->rollback();
+    }
+}
 
 // Get approved comments only
 $sql = "SELECT c.*, u.username, u.avatar 
@@ -302,7 +335,7 @@ $categories = getAllCategories();
         }
         .comment-header h4 {
             margin: 0;
-            color: #f48840;
+            color: #20232e;
             font-size: 18px;
         }
         .comment-header span {

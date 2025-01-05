@@ -288,7 +288,7 @@ $categories = getAllCategories();
             position: absolute;
             width: 45px;
             height: 45px;
-            background: #f48840 !important;
+            background: #0047cc !important;
             border-radius: 50% !important;
             outline: none;
             transition: all 0.3s;
@@ -306,7 +306,8 @@ $categories = getAllCategories();
         }
 
         .owl-banner .owl-nav button:hover {
-            background: #fb9857 !important;
+            background: #0047cc !important;
+            opacity: 0.8 !important;
             box-shadow: 0 3px 8px rgba(0,0,0,0.3);
         }
 
@@ -407,7 +408,78 @@ $categories = getAllCategories();
         }
 
         .owl-banner .item .item-content .post-info li a:hover {
-            color: #f48840;
+            color: #0047cc;
+        }
+
+        .blog-post {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s ease;
+            margin-bottom: 30px;
+            border-radius: 20px;
+            overflow: hidden;
+            background-color: #fff;
+        }
+        
+        .blog-post:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+
+        .blog-post .blog-thumb img {
+            border-radius: 20px 20px 0 0;
+        }
+
+        .down-content {
+            background-color: #fff;
+        }
+
+        .down-content span {
+            color: #0047cc !important;
+        }
+
+        .down-content h4 {
+            color: #333333;
+        }
+
+        .down-content ul.post-info li a {
+            color: #333333;
+        }
+
+        .down-content ul.post-info li a:hover {
+            color: #0047cc;
+        }
+
+        .post-options ul.post-tags li a {
+            color: #333333;
+        }
+
+        .post-options ul.post-tags li a:hover {
+            color: #0047cc;
+        }
+
+        .sidebar-item .content ul li a {
+            color: #333333;
+        }
+
+        .sidebar-item .content ul li a:hover {
+            color: #0047cc;
+        }
+
+        .sidebar-heading h2 {
+            color: #333333;
+        }
+
+        .pagination .page-item.active .page-link {
+            background-color: #0047cc;
+            border-color: #0047cc;
+        }
+
+        .pagination .page-link {
+            color: #0047cc;
+        }
+
+        .pagination .page-link:hover {
+            background-color: #0047cc;
+            color: #fff;
         }
     </style>
 </body>

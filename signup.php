@@ -21,13 +21,14 @@ if (isLoggedIn()) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = sanitizeInput($_POST['username']);
     $email = sanitizeInput($_POST['email']);
+    $phone_number = !empty($_POST['phone_number']) ? sanitizeInput($_POST['phone_number']) : null;
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
     $error = null;
     
     // Validate input
     if (empty($username) || empty($email) || empty($password) || empty($confirm_password)) {
-        $error = "All fields are required.";
+        $error = "All fields are required except phone number.";
     } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
     } elseif (strlen($password) < 6) {
@@ -44,11 +45,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Create new user
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             $role = 'user'; // Default role for new signups
-            $sql = "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)";
+            $sql = "INSERT INTO users (username, email, phone_number, password, role) VALUES (?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("ssss", $username, $email, $hashed_password, $role);
+            $stmt->bind_param("sssss", $username, $email, $phone_number, $hashed_password, $role);
             
             if ($stmt->execute()) {
+                // Add user to newsletter
+                $newsletter_sql = "INSERT IGNORE INTO netpy_newsletter_users (email) VALUES (?)";
+                $newsletter_stmt = $conn->prepare($newsletter_sql);
+                $newsletter_stmt->bind_param("s", $email);
+                $newsletter_stmt->execute();
+
                 // Set session and redirect
                 $_SESSION['user_id'] = $stmt->insert_id;
                 $_SESSION['username'] = $username;
@@ -113,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-top: 20px;
         }
         .login-link a {
-            color: #f48840;
+            color: #0047cc;
         }
         .login-link a:hover {
             text-decoration: underline;
@@ -165,6 +172,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                             <fieldset>
                                                 <label>Email</label>
                                                 <input name="email" type="email" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required>
+                                            </fieldset>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <fieldset>
+                                                <label>Phone Number (Optional)</label>
+                                                <input name="phone_number" type="tel" value="<?php echo isset($_POST['phone_number']) ? htmlspecialchars($_POST['phone_number']) : ''; ?>">
                                             </fieldset>
                                         </div>
                                         <div class="col-md-6">

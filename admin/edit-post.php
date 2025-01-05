@@ -50,7 +50,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $category_id = (int)$_POST['category_id'];
     $status = $_POST['status'];
     $featured = isset($_POST['featured']) ? 1 : 0;
-    $slug = createSlug($title);
+    
+    // Generate unique slug
+    $base_slug = createSlug($title);
+    $slug = $base_slug;
+    $counter = 1;
+    
+    // Check if slug exists (excluding current post)
+    $stmt = $conn->prepare("SELECT id FROM posts WHERE slug = ? AND id != ?");
+    $stmt->bind_param("si", $slug, $post_id);
+    $stmt->execute();
+    
+    // If slug exists, append number until unique
+    while ($stmt->get_result()->num_rows > 0) {
+        $slug = $base_slug . '-' . $counter;
+        $stmt->bind_param("si", $slug, $post_id);
+        $stmt->execute();
+        $counter++;
+    }
     
     // Handle image upload if new image is provided
     $image_path = $post['image_path'];
@@ -75,13 +92,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     // Update post
-    $sql = "UPDATE posts 
-            SET title = ?, slug = ?, content = ?, image_path = ?, category_id = ?, status = ?, featured = ? 
-            WHERE id = ? AND author_id = ?";
+    $sql = "UPDATE posts SET title = ?, slug = ?, content = ?, category_id = ?, status = ?, featured = ? WHERE id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ssssissii", $title, $slug, $content, $image_path, $category_id, $status, $featured, $post_id, $_SESSION['user_id']);
+    $stmt->bind_param("sssissi", $title, $slug, $content, $category_id, $status, $featured, $post_id);
     
     if ($stmt->execute()) {
+        // Check if status changed from draft to published
+        if ($status === 'published' && $post['status'] === 'draft') {
+            // Get all newsletter subscribers
+            $subscriber_sql = "SELECT email FROM netpy_newsletter_users";
+            $subscriber_result = $conn->query($subscriber_sql);
+            
+            if ($subscriber_result->num_rows > 0) {
+                require_once '../email.php';
+                
+                // Get the full URL for the blog post
+                $post_url = "http://" . $_SERVER['HTTP_HOST'] . "/post-details.php?slug=" . urlencode($slug);
+                
+                // Create email content
+                $subject = "New Blog Post: " . $title;
+                
+                // Create HTML email body
+                $htmlBody = "
+                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                        <h2 style='color: #f48840;'>New Blog Post Published!</h2>
+                        <h3>{$title}</h3>";
+                
+                // Add image if exists
+                if (!empty($image_path)) {
+                    $image_url = "http://" . $_SERVER['HTTP_HOST'] . "/" . $image_path;
+                    $htmlBody .= "<img src='{$image_url}' style='max-width: 100%; height: auto; margin: 20px 0;' alt='{$title}'>";
+                }
+                
+                $htmlBody .= "
+                        <div style='margin: 20px 0;'>
+                            " . substr(strip_tags($content), 0, 200) . "...
+                        </div>
+                        <a href='{$post_url}' style='display: inline-block; padding: 10px 20px; background-color: #f48840; color: white; text-decoration: none; border-radius: 5px;'>Read More</a>
+                        <p style='margin-top: 20px; font-size: 12px; color: #666;'>
+                            You received this email because you're subscribed to our newsletter. 
+                            <a href='http://" . $_SERVER['HTTP_HOST'] . "/unsubscribe.php'>Unsubscribe</a>
+                        </p>
+                    </div>";
+                
+                // Send email to each subscriber
+                while ($subscriber = $subscriber_result->fetch_assoc()) {
+                    sendEmail(
+                        $subscriber['email'],
+                        '',
+                        $subject,
+                        $htmlBody
+                    );
+                }
+            }
+        }
+
         // Update tags
         // First, remove all existing tags for this post
         $sql = "DELETE FROM post_tags WHERE post_id = ?";

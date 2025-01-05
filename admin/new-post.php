@@ -79,25 +79,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $stmt->bind_param("ssssiisi", $title, $slug, $content, $image_path, $category_id, $_SESSION['user_id'], $status, $featured);
             
-            if (!$stmt->execute()) {
-                throw new Exception("Execute failed: " . $stmt->error);
-            }
-            
-            // Handle tags
-            $post_id = $conn->insert_id;
-            if (!empty($_POST['tags']) && is_array($_POST['tags'])) {
-                $sql = "INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)";
-                $stmt = $conn->prepare($sql);
-                
-                foreach ($_POST['tags'] as $tag_id) {
-                    $tag_id = (int)$tag_id;
-                    $stmt->bind_param("ii", $post_id, $tag_id);
-                    $stmt->execute();
+            if ($stmt->execute()) {
+                $post_id = $stmt->insert_id;
+
+                // Handle tags
+                if (!empty($tags)) {
+                    insertPostTags($post_id, $tags);
                 }
+
+                // If post is published, send newsletter emails
+                if ($status === 'published') {
+                    // Get all newsletter subscribers
+                    $subscriber_sql = "SELECT email FROM netpy_newsletter_users";
+                    $subscriber_result = $conn->query($subscriber_sql);
+                    
+                    if ($subscriber_result->num_rows > 0) {
+                        require_once '../email.php';
+                        
+                        // Get the full URL for the blog post
+                        $post_url = "http://" . $_SERVER['HTTP_HOST'] . "/post-details.php?slug=" . urlencode($slug);
+                        
+                        // Create email content
+                        $subject = "New Blog Post: " . $title;
+                        
+                        // Create HTML email body
+                        $htmlBody = "
+                            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                                <h2 style='color: #f48840;'>New Blog Post Published!</h2>
+                                <h3>{$title}</h3>";
+                        
+                        // Add image if exists
+                        if (!empty($image_path)) {
+                            $image_url = "http://" . $_SERVER['HTTP_HOST'] . "/" . $image_path;
+                            $htmlBody .= "<img src='{$image_url}' style='max-width: 100%; height: auto; margin: 20px 0;' alt='{$title}'>";
+                        }
+                        
+                        $htmlBody .= "
+                                <div style='margin: 20px 0;'>
+                                    " . substr(strip_tags($content), 0, 200) . "...
+                                </div>
+                                <a href='{$post_url}' style='display: inline-block; padding: 10px 20px; background-color: #f48840; color: white; text-decoration: none; border-radius: 5px;'>Read More</a>
+                                <p style='margin-top: 20px; font-size: 12px; color: #666;'>
+                                    You received this email because you're subscribed to our newsletter. 
+                                    <a href='http://" . $_SERVER['HTTP_HOST'] . "/unsubscribe.php'>Unsubscribe</a>
+                                </p>
+                            </div>";
+                        
+                        // Send email to each subscriber
+                        while ($subscriber = $subscriber_result->fetch_assoc()) {
+                            sendEmail(
+                                $subscriber['email'],
+                                '',
+                                $subject,
+                                $htmlBody
+                            );
+                        }
+                    }
+                }
+
+                $_SESSION['success_msg'] = "Post created successfully!";
+                header('Location: dashboard.php');
+                exit;
+            } else {
+                $error = "Failed to create post. Please try again.";
             }
-            
-            header('Location: dashboard.php');
-            exit;
             
         } catch (Exception $e) {
             $errors[] = "Error: " . $e->getMessage();
