@@ -6,10 +6,10 @@ ini_set('display_errors', 1);
 define('TINYMCE_API_KEY', 'nz9stqlza3ji0i4oj5u6g3nbbvsizqxd2wrwyv5cn120k2y3');
 
 try {
-    $servername = "127.0.0.1";
-    $username = "elt";
-    $password = "Password";
-    $dbname = "netpy_blog";
+    $servername = 'localhost'; //"127.0.0.1";
+    $username = 'u599418396_netpy_blog'; //"elt";
+    $password = 'NetPyTechBlog@123'; //"Password";
+    $dbname = 'u599418396_netpy_blog'; //"netpy_blog";
 
     // Create connection
     $conn = mysqli_connect($servername, $username, $password, $dbname);
