@@ -8,87 +8,67 @@ if (!isLoggedIn() || $_SESSION['role'] !== 'author') {
     exit;
 }
 
-// Handle category creation/deletion
+// Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action'])) {
-        if ($_POST['action'] === 'add' && !empty($_POST['name'])) {
-            $name = html_entity_decode(sanitizeInput($_POST['name']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $slug = createSlug($name);
-            
-            // Check if category already exists
-            $stmt = $conn->prepare("SELECT id FROM categories WHERE name = ? OR slug = ?");
-            $stmt->bind_param("ss", $name, $slug);
-            $stmt->execute();
-            if ($stmt->get_result()->num_rows > 0) {
-                $error = "Category already exists.";
-            } else {
-                $sql = "INSERT INTO categories (name, slug) VALUES (?, ?)";
-                $stmt = $conn->prepare($sql);
+    $action = $_POST['action'] ?? '';
+    
+    switch ($action) {
+        case 'add':
+            $name = trim($_POST['name']);
+            if (!empty($name)) {
+                $slug = createSlug($name);
+                $stmt = $conn->prepare("INSERT INTO categories (name, slug) VALUES (?, ?)");
                 $stmt->bind_param("ss", $name, $slug);
                 if ($stmt->execute()) {
-                    $_SESSION['success_msg'] = "Category created successfully!";
-                    header('Location: manage-categories.php');
-                    exit();
+                    $_SESSION['success_msg'] = "Category added successfully!";
                 } else {
-                    $error = "Error creating category.";
+                    $error = "Error adding category.";
                 }
+                $stmt->close();
             }
-        } 
-        elseif ($_POST['action'] === 'edit' && !empty($_POST['category_id']) && !empty($_POST['name'])) {
-            $category_id = (int)$_POST['category_id'];
-            $name = html_entity_decode(sanitizeInput($_POST['name']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $slug = createSlug($name);
+            break;
             
-            // Check if category name already exists for another category
-            $stmt = $conn->prepare("SELECT id FROM categories WHERE (name = ? OR slug = ?) AND id != ?");
-            $stmt->bind_param("ssi", $name, $slug, $category_id);
-            $stmt->execute();
-            if ($stmt->get_result()->num_rows > 0) {
-                $error = "Category name already exists.";
-            } else {
-                $sql = "UPDATE categories SET name = ?, slug = ? WHERE id = ?";
-                $stmt = $conn->prepare($sql);
+        case 'edit':
+            $category_id = $_POST['category_id'];
+            $name = trim($_POST['name']);
+            if (!empty($name) && !empty($category_id)) {
+                $slug = createSlug($name);
+                $stmt = $conn->prepare("UPDATE categories SET name = ?, slug = ? WHERE id = ?");
                 $stmt->bind_param("ssi", $name, $slug, $category_id);
                 if ($stmt->execute()) {
                     $_SESSION['success_msg'] = "Category updated successfully!";
-                    header('Location: manage-categories.php');
-                    exit();
                 } else {
                     $error = "Error updating category.";
                 }
+                $stmt->close();
             }
-        }
-        elseif ($_POST['action'] === 'delete' && !empty($_POST['category_id'])) {
-            $category_id = (int)$_POST['category_id'];
+            break;
             
-            // Check if category has posts
-            $stmt = $conn->prepare("SELECT COUNT(*) as post_count FROM posts WHERE category_id = ?");
-            $stmt->bind_param("i", $category_id);
-            $stmt->execute();
-            $result = $stmt->get_result()->fetch_assoc();
-            
-            if ($result['post_count'] > 0) {
-                $error = "Cannot delete category. It has associated posts.";
-            } else {
-                $sql = "DELETE FROM categories WHERE id = ?";
-                $stmt = $conn->prepare($sql);
+        case 'deactivate':
+            $category_id = $_POST['category_id'];
+            if (!empty($category_id)) {
+                $stmt = $conn->prepare("UPDATE categories SET is_active = 0 WHERE id = ?");
                 $stmt->bind_param("i", $category_id);
                 if ($stmt->execute()) {
-                    $_SESSION['success_msg'] = "Category deleted successfully!";
-                    header('Location: manage-categories.php');
-                    exit();
+                    $_SESSION['success_msg'] = "Category deactivated successfully!";
                 } else {
-                    $error = "Error deleting category.";
+                    $error = "Error deactivating category.";
                 }
+                $stmt->close();
             }
-        }
+            break;
     }
+    
+    // Redirect to refresh the page
+    header('Location: manage-categories.php');
+    exit;
 }
 
-// Get all categories with post count
+// Get all active categories with post count
 $sql = "SELECT c.*, COUNT(p.id) as post_count 
         FROM categories c 
-        LEFT JOIN posts p ON c.id = p.category_id 
+        LEFT JOIN posts p ON c.id = p.category_id AND p.deleted_at IS NULL
+        WHERE c.is_active = 1 AND c.deleted_at IS NULL
         GROUP BY c.id 
         ORDER BY c.name";
 $result = $conn->query($sql);
@@ -186,15 +166,13 @@ include '../includes/header.php';
                                         <td><?php echo $category['post_count']; ?></td>
                                         <td>
                                             <button class="btn btn-primary btn-sm edit-category">Edit</button>
-                                            <?php if ($category['post_count'] == 0): ?>
-                                                <form action="manage-categories.php" method="post" style="display: inline;">
-                                                    <input type="hidden" name="action" value="delete">
-                                                    <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
-                                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this category?')">Delete</button>
-                                                </form>
-                                            <?php else: ?>
-                                                <button class="btn btn-danger btn-sm" disabled title="Cannot delete category with associated posts">Delete</button>
-                                            <?php endif; ?>
+                                            <form method="POST" style="display: inline;">
+                                                <input type="hidden" name="action" value="deactivate">
+                                                <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
+                                                <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Are you sure you want to deactivate this category?');">
+                                                    Deactivate
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>

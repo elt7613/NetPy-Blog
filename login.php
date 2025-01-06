@@ -18,38 +18,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($email) || empty($password)) {
         $error = "All fields are required.";
     } else {
-        // Check credentials
-        $sql = "SELECT * FROM users WHERE email = ?";
+        // Get username from email
+        $sql = "SELECT username FROM users WHERE email = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("s", $email);
         $stmt->execute();
-        $user = $stmt->get_result()->fetch_assoc();
+        $result = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
         
-        if ($user && password_verify($password, $user['password'])) {
-            // Set session and redirect
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            
-            // Check if there's a return URL
-            if (isset($_GET['return_url'])) {
-                $return_url = $_GET['return_url'];
-                // Validate the return URL to ensure it's a local URL
-                if (strpos($return_url, '/') === 0) {
-                    header('Location: ' . $return_url);
-                    exit;
+        if ($result) {
+            $username = $result['username'];
+            // Use loginUser function to check credentials and active status
+            if (loginUser($username, $password)) {
+                // Check if there's a return URL
+                if (isset($_GET['return_url'])) {
+                    $return_url = $_GET['return_url'];
+                    // Validate the return URL to ensure it's a local URL
+                    if (strpos($return_url, '/') === 0) {
+                        header('Location: ' . $return_url);
+                        exit;
+                    }
                 }
-            }
-            
-            // If no return URL or invalid, redirect to default location
-            if ($user['role'] === 'admin') {
-                header('Location: admin/dashboard.php');
+                
+                // If no return URL or invalid, redirect to default location
+                if ($_SESSION['role'] === 'admin') {
+                    header('Location: admin/dashboard.php');
+                } else {
+                    header('Location: index.php');
+                }
+                exit;
             } else {
-                header('Location: index.php');
+                $error = "Invalid credentials or account is inactive.";
             }
-            exit;
         } else {
-            $error = "Invalid username or password.";
+            $error = "Invalid credentials or account is inactive.";
         }
     }
 }

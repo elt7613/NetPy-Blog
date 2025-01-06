@@ -8,38 +8,30 @@ if (!isLoggedIn() || !isAdmin()) {
     exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['post_id'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post_id = (int)$_POST['post_id'];
     
-    // Get post image path before deletion
-    $stmt = $conn->prepare("SELECT image_path FROM posts WHERE id = ?");
-    $stmt->bind_param("i", $post_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $post = $result->fetch_assoc();
-    
-    // Delete post tags first (foreign key constraint)
-    $stmt = $conn->prepare("DELETE FROM post_tags WHERE post_id = ?");
-    $stmt->bind_param("i", $post_id);
-    $stmt->execute();
-    
-    // Delete comments associated with the post
-    $stmt = $conn->prepare("DELETE FROM comments WHERE post_id = ?");
-    $stmt->bind_param("i", $post_id);
-    $stmt->execute();
-    
-    // Delete the post
-    $stmt = $conn->prepare("DELETE FROM posts WHERE id = ?");
-    $stmt->bind_param("i", $post_id);
-    
-    if ($stmt->execute()) {
-        // Delete the post image if it exists
-        if ($post && $post['image_path'] && file_exists('../' . $post['image_path'])) {
-            unlink('../' . $post['image_path']);
+    if (isset($_POST['toggle_status'])) {
+        // Toggle post active status
+        $new_status = (int)$_POST['new_status'];
+        $stmt = $conn->prepare("UPDATE posts SET is_active = ? WHERE id = ?");
+        $stmt->bind_param("ii", $new_status, $post_id);
+        
+        if ($stmt->execute()) {
+            $_SESSION['success_msg'] = $new_status ? "Post activated successfully!" : "Post deactivated successfully!";
+        } else {
+            $_SESSION['error_msg'] = "Error updating post status.";
         }
-        $_SESSION['success_msg'] = "Post deleted successfully!";
-    } else {
-        $_SESSION['error_msg'] = "Error deleting post.";
+    } else if (isset($_POST['delete_post'])) {
+        // Soft delete the post
+        $stmt = $conn->prepare("UPDATE posts SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->bind_param("i", $post_id);
+        
+        if ($stmt->execute()) {
+            $_SESSION['success_msg'] = "Post soft deleted successfully!";
+        } else {
+            $_SESSION['error_msg'] = "Error deleting post.";
+        }
     }
 }
 

@@ -76,7 +76,7 @@ $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
                 <div class="collapse navbar-collapse" id="navbarResponsive">
                     <ul class="navbar-nav ml-auto">
                         <li class="nav-item">
-                            <a class="nav-link" href="https://netpy.in/" target="_blank">Home</a>
+                            <a class="nav-link" href="https://netpy.in/" target="_blank">Explore NetPy</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="<?php echo $base_url; ?>index.php">Blogs</a>

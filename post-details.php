@@ -23,10 +23,25 @@ $isAuthor = isLoggedIn() && $_SESSION['user_id'] == $post['author_id'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_comment']) && (isAdmin() || $isAuthor)) {
     $comment_id = (int)$_POST['comment_id'];
     
-    // Delete the comment and its replies
-    $sql = "DELETE FROM comments WHERE id = ? OR parent_id = ?";
+    // Soft delete the comment and its replies
+    $sql = "UPDATE comments SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? OR parent_id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("ii", $comment_id, $comment_id);
+    $stmt->execute();
+    
+    header("Location: " . $_SERVER['PHP_SELF'] . "?slug=" . urlencode($slug) . "#comments");
+    exit;
+}
+
+// Handle comment activation/deactivation
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_comment']) && (isAdmin() || $isAuthor)) {
+    $comment_id = (int)$_POST['comment_id'];
+    $new_status = (int)$_POST['new_status'];
+    
+    // Toggle comment status
+    $sql = "UPDATE comments SET is_active = ? WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ii", $new_status, $comment_id);
     $stmt->execute();
     
     header("Location: " . $_SERVER['PHP_SELF'] . "?slug=" . urlencode($slug) . "#comments");
@@ -76,7 +91,7 @@ if ($result->num_rows === 0) {
 $sql = "SELECT c.*, u.username, u.avatar 
         FROM comments c 
         JOIN users u ON c.user_id = u.id 
-        WHERE c.post_id = ? 
+        WHERE c.post_id = ? AND c.deleted_at IS NULL AND c.is_active = 1
         ORDER BY c.parent_id ASC, c.created_at DESC";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $post['id']);
@@ -130,6 +145,17 @@ function displayComment($comment, $comment_replies, $level = 0) {
                                 </button>
                             <?php endif; ?>
                             <?php if (isAdmin() || $isAuthor): ?>
+                                <form action="post-details.php?slug=<?php echo urlencode($_GET['slug']); ?>#comments" 
+                                      method="post" 
+                                      class="d-inline">
+                                    <input type="hidden" name="comment_id" value="<?php echo $comment['id']; ?>">
+                                    <input type="hidden" name="new_status" value="<?php echo $comment['is_active'] ? '0' : '1'; ?>">
+                                    <button type="submit" 
+                                            name="toggle_comment" 
+                                            class="btn btn-sm btn-link <?php echo $comment['is_active'] ? 'text-warning' : 'text-success'; ?>">
+                                        <?php echo $comment['is_active'] ? 'Deactivate' : 'Activate'; ?>
+                                    </button>
+                                </form>
                                 <form action="post-details.php?slug=<?php echo urlencode($_GET['slug']); ?>#comments" 
                                       method="post" 
                                       class="d-inline" 
@@ -661,7 +687,9 @@ $categories = getAllCategories();
                                                         $sql = "SELECT t.name, t.slug 
                                                                 FROM tags t 
                                                                 JOIN post_tags pt ON t.id = pt.tag_id 
-                                                                WHERE pt.post_id = ?";
+                                                                WHERE pt.post_id = ?
+                                                                AND t.deleted_at IS NULL 
+                                                                AND t.is_active = 1";
                                                         $stmt = $conn->prepare($sql);
                                                         $stmt->bind_param("i", $post['id']);
                                                         $stmt->execute();

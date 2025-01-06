@@ -9,10 +9,10 @@ if (!isLoggedIn() || $_SESSION['role'] !== 'author') {
 }
 
 // Get categories for the dropdown
-$categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+$categories = $conn->query("SELECT * FROM categories WHERE deleted_at IS NULL AND is_active = 1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 
 // Get tags for the dropdown
-$tags = $conn->query("SELECT * FROM tags ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+$tags = $conn->query("SELECT * FROM tags WHERE deleted_at IS NULL AND is_active = 1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 
 // Handle post creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -95,8 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // If post is published, send newsletter emails
             if ($status === 'published') {
-                // Get all newsletter subscribers
-                $subscriber_sql = "SELECT email FROM netpy_newsletter_users";
+                // Get all active newsletter subscribers
+                $subscriber_sql = "SELECT email FROM netpy_newsletter_users WHERE deleted_at IS NULL AND is_active = 1";
                 $subscriber_result = $conn->query($subscriber_sql);
                 
                 if ($subscriber_result->num_rows > 0) {

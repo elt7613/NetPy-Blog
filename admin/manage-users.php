@@ -13,10 +13,10 @@ if (isset($_POST['delete_user'])) {
     $user_id = $_POST['user_id'];
     // Prevent deleting own account
     if ($user_id != $_SESSION['user_id']) {
-        $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?");
         $stmt->bind_param("i", $user_id);
         $stmt->execute();
-        $_SESSION['success_msg'] = "User deleted successfully!";
+        $_SESSION['success_msg'] = "User soft deleted successfully!";
     } else {
         $_SESSION['error_msg'] = "You cannot delete your own account!";
     }
@@ -24,18 +24,18 @@ if (isset($_POST['delete_user'])) {
     exit();
 }
 
-// Handle role change
-if (isset($_POST['change_role'])) {
+// Handle user activation/deactivation
+if (isset($_POST['toggle_status'])) {
     $user_id = $_POST['user_id'];
-    $new_role = $_POST['new_role'];
-    // Prevent changing own role
+    $new_status = $_POST['new_status'];
+    // Prevent changing own status
     if ($user_id != $_SESSION['user_id']) {
-        $stmt = $conn->prepare("UPDATE users SET role = ? WHERE id = ?");
-        $stmt->bind_param("si", $new_role, $user_id);
+        $stmt = $conn->prepare("UPDATE users SET is_active = ? WHERE id = ?");
+        $stmt->bind_param("ii", $new_status, $user_id);
         $stmt->execute();
-        $_SESSION['success_msg'] = "User role updated successfully!";
+        $_SESSION['success_msg'] = "User status updated successfully!";
     } else {
-        $_SESSION['error_msg'] = "You cannot change your own role!";
+        $_SESSION['error_msg'] = "You cannot change your own status!";
     }
     header('Location: manage-users.php');
     exit();
@@ -100,7 +100,7 @@ $total_pages = ceil($total_users / $users_per_page);
 $page = max(1, min($page, $total_pages));
 
 // Build the search query with pagination
-$sql = "SELECT id, username, email, role, created_at FROM users WHERE 1=1";
+$sql = "SELECT id, username, email, role, created_at, is_active FROM users WHERE deleted_at IS NULL";
 $params = [];
 $types = "";
 
@@ -138,6 +138,14 @@ $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
 $params[] = &$users_per_page;
 $params[] = &$offset;
 $types .= "ii";
+
+// Add a filter for active/inactive status if provided
+$status_filter = isset($_GET['status']) ? $_GET['status'] : '';
+if ($status_filter !== '') {
+    $sql .= " AND is_active = ?";
+    $params[] = &$status_filter;
+    $types .= "i";
+}
 
 // Prepare and execute the query
 $stmt = $conn->prepare($sql);
@@ -217,6 +225,13 @@ include '../includes/header.php';
                                     <div class="col-md-2">
                                         <input type="date" name="date_to" class="form-control" placeholder="To Date" value="<?php echo htmlspecialchars($date_to); ?>" title="To Date">
                                     </div>
+                                    <div class="col-md-2">
+                                        <select name="status" class="form-control">
+                                            <option value="">All Status</option>
+                                            <option value="1" <?php echo $status_filter === '1' ? 'selected' : ''; ?>>Active</option>
+                                            <option value="0" <?php echo $status_filter === '0' ? 'selected' : ''; ?>>Inactive</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-1">
                                         <button type="submit" class="btn btn-primary w-100">Search</button>
                                         <?php if (!empty($search) || !empty($role_filter) || !empty($date_from) || !empty($date_to)): ?>
@@ -288,10 +303,12 @@ include '../includes/header.php';
                                             <td><?php echo date('M d, Y', strtotime($user['created_at'])); ?></td>
                                             <td>
                                                 <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                                    <form method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this user?');">
+                                                    <form method="POST" style="display: inline;">
                                                         <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
-                                                        <input type="hidden" name="delete_user" value="1">
-                                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                                        <input type="hidden" name="new_status" value="<?php echo $user['is_active'] ? '0' : '1'; ?>">
+                                                        <button type="submit" name="toggle_status" class="btn btn-<?php echo $user['is_active'] ? 'warning' : 'success'; ?> btn-sm">
+                                                            <?php echo $user['is_active'] ? 'Deactivate' : 'Activate'; ?>
+                                                        </button>
                                                     </form>
                                                 <?php endif; ?>
                                             </td>

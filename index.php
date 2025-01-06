@@ -8,7 +8,17 @@ $posts_per_page = 10;
 $offset = ($page - 1) * $posts_per_page;
 
 // Get total number of published posts
-$count_sql = "SELECT COUNT(*) as total FROM posts WHERE status = 'published'";
+$count_sql = "SELECT COUNT(*) as total 
+              FROM posts p
+              LEFT JOIN categories c ON p.category_id = c.id 
+              LEFT JOIN users u ON p.author_id = u.id 
+              WHERE p.status = 'published'
+              AND p.deleted_at IS NULL 
+              AND p.is_active = 1
+              AND c.deleted_at IS NULL 
+              AND c.is_active = 1
+              AND u.deleted_at IS NULL 
+              AND u.is_active = 1";
 $total_posts = $conn->query($count_sql)->fetch_assoc()['total'];
 $total_pages = ceil($total_posts / $posts_per_page);
 
@@ -22,9 +32,15 @@ $sql = "SELECT p.*, c.name as category_name, u.username as author_name,
         LEFT JOIN categories c ON p.category_id = c.id 
         LEFT JOIN users u ON p.author_id = u.id 
         LEFT JOIN post_tags pt ON p.id = pt.post_id
-        LEFT JOIN tags t ON pt.tag_id = t.id
+        LEFT JOIN tags t ON pt.tag_id = t.id AND t.deleted_at IS NULL AND t.is_active = 1
         WHERE p.status = 'published'
-        GROUP BY p.id 
+        AND p.deleted_at IS NULL 
+        AND p.is_active = 1
+        AND c.deleted_at IS NULL 
+        AND c.is_active = 1
+        AND u.deleted_at IS NULL 
+        AND u.is_active = 1
+        GROUP BY p.id, c.name, u.username, p.title, p.slug, p.content, p.created_at, p.image_path, p.views 
         ORDER BY p.created_at DESC 
         LIMIT ? OFFSET ?";
 
@@ -33,11 +49,75 @@ $stmt->bind_param("ii", $posts_per_page, $offset);
 $stmt->execute();
 $posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-// Get featured posts for the banner
-$featured_posts = getFeaturedPosts(6);
+// Get featured posts
+$featured_sql = "SELECT p.*, c.name as category_name, u.username as author_name,
+                GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
+                FROM posts p 
+                LEFT JOIN categories c ON p.category_id = c.id 
+                LEFT JOIN users u ON p.author_id = u.id 
+                LEFT JOIN post_tags pt ON p.id = pt.post_id
+                LEFT JOIN tags t ON pt.tag_id = t.id AND t.deleted_at IS NULL AND t.is_active = 1
+                WHERE p.status = 'published' 
+                AND p.featured = 1 
+                AND p.deleted_at IS NULL 
+                AND p.is_active = 1
+                AND c.deleted_at IS NULL 
+                AND c.is_active = 1
+                AND u.deleted_at IS NULL 
+                AND u.is_active = 1
+                GROUP BY p.id, c.name, u.username, p.title, p.slug, p.content, p.created_at, p.image_path, p.views
+                ORDER BY p.created_at DESC 
+                LIMIT 3";
+$featured_posts = $conn->query($featured_sql)->fetch_all(MYSQLI_ASSOC);
 
-// Get all categories for sidebar
-$categories = getAllCategories();
+// Get recent posts
+$recent_sql = "SELECT p.*, c.name as category_name, u.username as author_name,
+              GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
+              FROM posts p 
+              LEFT JOIN categories c ON p.category_id = c.id 
+              LEFT JOIN users u ON p.author_id = u.id 
+              LEFT JOIN post_tags pt ON p.id = pt.post_id
+              LEFT JOIN tags t ON pt.tag_id = t.id AND t.deleted_at IS NULL AND t.is_active = 1
+              WHERE p.status = 'published' 
+              AND p.deleted_at IS NULL 
+              AND p.is_active = 1
+              AND c.deleted_at IS NULL 
+              AND c.is_active = 1
+              AND u.deleted_at IS NULL 
+              AND u.is_active = 1
+              GROUP BY p.id, c.name, u.username, p.title, p.slug, p.content, p.created_at, p.image_path, p.views
+              ORDER BY p.created_at DESC 
+              LIMIT 6";
+$recent_posts = $conn->query($recent_sql)->fetch_all(MYSQLI_ASSOC);
+
+// Get categories with post count
+$categories_sql = "SELECT c.*, COUNT(p.id) as post_count 
+                  FROM categories c 
+                  LEFT JOIN posts p ON c.id = p.category_id 
+                  AND p.status = 'published' 
+                  AND p.deleted_at IS NULL 
+                  AND p.is_active = 1
+                  WHERE c.deleted_at IS NULL 
+                  AND c.is_active = 1
+                  GROUP BY c.id 
+                  ORDER BY c.name";
+$categories = $conn->query($categories_sql)->fetch_all(MYSQLI_ASSOC);
+
+// Get tags with post count
+$tags_sql = "SELECT t.*, COUNT(DISTINCT pt.post_id) as post_count 
+             FROM tags t 
+             LEFT JOIN post_tags pt ON t.id = pt.tag_id 
+             LEFT JOIN posts p ON pt.post_id = p.id 
+             AND p.status = 'published' 
+             AND p.deleted_at IS NULL 
+             AND p.is_active = 1
+             WHERE t.deleted_at IS NULL 
+             AND t.is_active = 1
+             GROUP BY t.id 
+             HAVING post_count > 0 
+             ORDER BY post_count DESC, t.name 
+             LIMIT 10";
+$tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!DOCTYPE html>

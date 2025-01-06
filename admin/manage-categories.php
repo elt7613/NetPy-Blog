@@ -8,7 +8,7 @@ if (!isLoggedIn() || !isAdmin()) {
     exit;
 }
 
-// Handle category creation/deletion
+// Handle category operations
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         if ($_POST['action'] === 'add' && !empty($_POST['name'])) {
@@ -21,22 +21,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
         } 
         elseif ($_POST['action'] === 'delete' && !empty($_POST['category_id'])) {
-            // Check if category has posts
             $category_id = (int)$_POST['category_id'];
-            $sql = "SELECT COUNT(*) as post_count FROM posts WHERE category_id = ?";
+            // Soft delete the category
+            $sql = "UPDATE categories SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("i", $category_id);
             $stmt->execute();
-            $result = $stmt->get_result()->fetch_assoc();
+        }
+        elseif ($_POST['action'] === 'toggle_status' && !empty($_POST['category_id'])) {
+            $category_id = (int)$_POST['category_id'];
+            $new_status = (int)$_POST['new_status'];
             
-            if ($result['post_count'] > 0) {
-                $error = "Cannot delete category. It has associated posts.";
-            } else {
-                $sql = "DELETE FROM categories WHERE id = ?";
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param("i", $category_id);
-                $stmt->execute();
-            }
+            $sql = "UPDATE categories SET is_active = ? WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ii", $new_status, $category_id);
+            $stmt->execute();
         }
         elseif ($_POST['action'] === 'edit' && !empty($_POST['category_id']) && !empty($_POST['name'])) {
             $category_id = (int)$_POST['category_id'];
@@ -51,14 +50,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get all categories
+// Get search parameters
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$show_deleted = isset($_GET['show_deleted']) ? $_GET['show_deleted'] : '0';
+
+// Initialize parameters array and types string
+$params = array();
+$types = '';
+
+// Base query
 $sql = "SELECT c.*, COUNT(p.id) as post_count 
         FROM categories c 
-        LEFT JOIN posts p ON c.id = p.category_id 
-        GROUP BY c.id 
-        ORDER BY c.name";
-$result = $conn->query($sql);
+        LEFT JOIN posts p ON c.id = p.category_id AND p.deleted_at IS NULL 
+        WHERE " . ($show_deleted === '1' ? "c.deleted_at IS NOT NULL" : "c.deleted_at IS NULL");
+
+// Add search condition if search term is provided
+if (!empty($search)) {
+    $sql .= " AND c.name LIKE ?";
+    $params[] = "%$search%";
+    $types .= "s";
+}
+
+$sql .= " GROUP BY c.id ORDER BY c.name ASC";
+
+// Prepare and execute the statement
+$stmt = $conn->prepare($sql);
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$result = $stmt->get_result();
 $categories = $result->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -72,6 +95,48 @@ $categories = $result->fetch_all(MYSQLI_ASSOC);
     <link rel="stylesheet" href="../assets/css/fontawesome.css">
     <link rel="stylesheet" href="../assets/css/templatemo-stand-blog.css">
     <link rel="stylesheet" href="../assets/css/owl.css">
+    <style>
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+            color: white;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            border-color: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+            border-color: #d39e00;
+            color: #212529;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+            color: white;
+        }
+    </style>
 </head>
 
 <body>
@@ -136,6 +201,25 @@ $categories = $result->fetch_all(MYSQLI_ASSOC);
                                 <h2>Existing Categories</h2>
                             </div>
                             <div class="content">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <form method="GET" action="manage-categories.php">
+                                            <div class="input-group">
+                                                <input type="text" name="search" class="form-control" placeholder="Search categories..." value="<?php echo htmlspecialchars($search); ?>">
+                                                <select name="show_deleted" class="form-control">
+                                                    <option value="0" <?php echo $show_deleted === '0' ? 'selected' : ''; ?>>Active Categories</option>
+                                                    <option value="1" <?php echo $show_deleted === '1' ? 'selected' : ''; ?>>Deleted Categories</option>
+                                                </select>
+                                                <div class="input-group-append">
+                                                    <button type="submit" class="btn btn-primary">Search</button>
+                                                    <?php if (!empty($search) || $show_deleted !== '0'): ?>
+                                                        <a href="manage-categories.php" class="btn btn-secondary">Clear</a>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                                 <div class="table-responsive">
                                     <table class="table">
                                         <thead>
@@ -168,12 +252,28 @@ $categories = $result->fetch_all(MYSQLI_ASSOC);
                                                 <td><?php echo htmlspecialchars($category['slug']); ?></td>
                                                 <td><?php echo $category['post_count']; ?></td>
                                                 <td>
-                                                    <button class="btn btn-primary btn-sm edit-category">Edit</button>
-                                                    <form action="manage-categories.php" method="post" style="display: inline;">
-                                                        <input type="hidden" name="action" value="delete">
-                                                        <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
-                                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this category?')" <?php echo $category['post_count'] > 0 ? 'disabled' : ''; ?>>Delete</button>
-                                                    </form>
+                                                    <?php if ($show_deleted === '0'): ?>
+                                                        <button class="btn btn-primary btn-sm edit-category">
+                                                            <i class="fa fa-edit"></i> Edit
+                                                        </button>
+                                                        <form action="manage-categories.php" method="post" style="display: inline;">
+                                                            <input type="hidden" name="action" value="toggle_status">
+                                                            <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
+                                                            <input type="hidden" name="new_status" value="<?php echo $category['is_active'] ? '0' : '1'; ?>">
+                                                            <button type="submit" class="btn <?php echo $category['is_active'] ? 'btn-warning' : 'btn-success'; ?> btn-sm">
+                                                                <?php echo $category['is_active'] ? '<i class="fa fa-pause"></i> Deactivate' : '<i class="fa fa-play"></i> Activate'; ?>
+                                                            </button>
+                                                        </form>
+                                                        <form action="manage-categories.php" method="post" style="display: inline;">
+                                                            <input type="hidden" name="action" value="delete">
+                                                            <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
+                                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this category?')">
+                                                                <i class="fa fa-trash"></i> Delete
+                                                            </button>
+                                                        </form>
+                                                    <?php else: ?>
+                                                        <span class="badge badge-danger">Deleted</span>
+                                                    <?php endif; ?>
                                                 </td>
                                             </tr>
                                             <?php endforeach; ?>

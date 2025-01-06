@@ -12,6 +12,8 @@ if (!isLoggedIn() || $_SESSION['role'] !== 'author') {
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $search_by = isset($_GET['search_by']) ? $_GET['search_by'] : 'title';
 $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
+$active_filter = isset($_GET['active']) ? $_GET['active'] : '';
+$show_deleted = isset($_GET['show_deleted']) ? $_GET['show_deleted'] : '0';
 $date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
 $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 
@@ -21,7 +23,7 @@ $sql = "SELECT
             SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) as published_posts,
             SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_posts,
             SUM(CASE WHEN featured = 1 THEN 1 ELSE 0 END) as featured_posts
-        FROM posts WHERE author_id = ?";
+        FROM posts WHERE author_id = ? AND deleted_at IS NULL";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
@@ -37,7 +39,12 @@ $count_sql = "SELECT COUNT(DISTINCT p.id) as total FROM posts p
               LEFT JOIN categories c ON p.category_id = c.id 
               LEFT JOIN post_tags pt ON p.id = pt.post_id
               LEFT JOIN tags t ON pt.tag_id = t.id
-              WHERE p.author_id = ?";
+              WHERE p.author_id = ? AND " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL");
+
+// Add active/inactive filter
+if ($active_filter !== '') {
+    $count_sql .= " AND p.is_active = ?";
+}
 
 // Add search conditions to count query
 if (!empty($search)) {
@@ -99,8 +106,15 @@ $sql = "SELECT DISTINCT p.*, c.name as category_name,
         FROM posts p 
         LEFT JOIN categories c ON p.category_id = c.id 
         LEFT JOIN post_tags pt ON p.id = pt.post_id
-        LEFT JOIN tags t ON pt.tag_id = t.id
-        WHERE p.author_id = ?";
+        LEFT JOIN tags t ON pt.tag_id = t.id AND t.deleted_at IS NULL AND t.is_active = 1
+        WHERE p.author_id = ? 
+        AND " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL") . "
+        AND (c.id IS NULL OR (c.deleted_at IS NULL AND c.is_active = 1))";
+
+// Add active/inactive filter
+if ($active_filter !== '') {
+    $sql .= " AND p.is_active = ?";
+}
 
 // Add search conditions
 if (!empty($search)) {
@@ -438,6 +452,19 @@ $page_title = "Author Dashboard";
                                         <div class="col-md-2">
                                             <input type="date" name="date_to" class="form-control" placeholder="To Date" value="<?php echo htmlspecialchars($date_to); ?>">
                                         </div>
+                                        <div class="col-md-2">
+                                            <select name="active" class="form-control">
+                                                <option value="">All Posts</option>
+                                                <option value="1" <?php echo $active_filter === '1' ? 'selected' : ''; ?>>Active</option>
+                                                <option value="0" <?php echo $active_filter === '0' ? 'selected' : ''; ?>>Inactive</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <select name="show_deleted" class="form-control">
+                                                <option value="0" <?php echo $show_deleted === '0' ? 'selected' : ''; ?>>Active Posts</option>
+                                                <option value="1" <?php echo $show_deleted === '1' ? 'selected' : ''; ?>>Deleted Posts</option>
+                                            </select>
+                                        </div>
                                         <div class="col-md-1">
                                             <button type="submit" class="btn btn-primary">Search</button>
                                             <?php if (!empty($search) || !empty($status_filter) || !empty($date_from) || !empty($date_to)): ?>
@@ -489,12 +516,22 @@ $page_title = "Author Dashboard";
                                             </td>
                                             <td><?php echo date('M j, Y', strtotime($post['created_at'])); ?></td>
                                             <td>
-                                                <a href="edit-post.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-primary">Edit</a>
-                                                <a href="../post-details.php?slug=<?php echo $post['slug']; ?>" class="btn btn-sm btn-info" target="_blank">View</a>
-                                                <form action="delete-post.php" method="post" style="display: inline;">
-                                                    <input type="hidden" name="post_id" value="<?php echo $post['id']; ?>">
-                                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this post?')">Delete</button>
-                                                </form>
+                                                <?php if ($show_deleted === '0'): ?>
+                                                    <a href="edit-post.php?id=<?php echo $post['id']; ?>" class="btn btn-primary btn-sm">Edit</a>
+                                                    <a href="../post-details.php?slug=<?php echo $post['slug']; ?>" class="btn btn-info btn-sm" target="_blank">View</a>
+                                                    <form method="POST" action="delete-post.php" style="display: inline;">
+                                                        <input type="hidden" name="post_id" value="<?php echo $post['id']; ?>">
+                                                        <input type="hidden" name="new_status" value="<?php echo $post['is_active'] ? '0' : '1'; ?>">
+                                                        <button type="submit" name="toggle_status" class="btn btn-<?php echo $post['is_active'] ? 'warning' : 'success'; ?> btn-sm">
+                                                            <?php echo $post['is_active'] ? 'Deactivate' : 'Activate'; ?>
+                                                        </button>
+                                                        <button type="submit" name="delete_post" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this post?');">
+                                                            Delete
+                                                        </button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <span class="badge badge-danger">Deleted</span>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>

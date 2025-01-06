@@ -8,87 +8,68 @@ if (!isLoggedIn() || $_SESSION['role'] !== 'author') {
     exit;
 }
 
-// Handle tag creation/deletion
+// Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action'])) {
-        if ($_POST['action'] === 'add' && !empty($_POST['name'])) {
-            $name = html_entity_decode(sanitizeInput($_POST['name']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $slug = createSlug($name);
-            
-            // Check if tag already exists
-            $stmt = $conn->prepare("SELECT id FROM tags WHERE name = ? OR slug = ?");
-            $stmt->bind_param("ss", $name, $slug);
-            $stmt->execute();
-            if ($stmt->get_result()->num_rows > 0) {
-                $error = "Tag already exists.";
-            } else {
-                $sql = "INSERT INTO tags (name, slug) VALUES (?, ?)";
-                $stmt = $conn->prepare($sql);
+    $action = $_POST['action'] ?? '';
+    
+    switch ($action) {
+        case 'add':
+            $name = trim($_POST['name']);
+            if (!empty($name)) {
+                $slug = createSlug($name);
+                $stmt = $conn->prepare("INSERT INTO tags (name, slug) VALUES (?, ?)");
                 $stmt->bind_param("ss", $name, $slug);
                 if ($stmt->execute()) {
-                    $_SESSION['success_msg'] = "Tag created successfully!";
-                    header('Location: manage-tags.php');
-                    exit();
+                    $_SESSION['success_msg'] = "Tag added successfully!";
                 } else {
-                    $error = "Error creating tag.";
+                    $error = "Error adding tag.";
                 }
+                $stmt->close();
             }
-        } 
-        elseif ($_POST['action'] === 'edit' && !empty($_POST['tag_id']) && !empty($_POST['name'])) {
-            $tag_id = (int)$_POST['tag_id'];
-            $name = html_entity_decode(sanitizeInput($_POST['name']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $slug = createSlug($name);
+            break;
             
-            // Check if tag name already exists for another tag
-            $stmt = $conn->prepare("SELECT id FROM tags WHERE (name = ? OR slug = ?) AND id != ?");
-            $stmt->bind_param("ssi", $name, $slug, $tag_id);
-            $stmt->execute();
-            if ($stmt->get_result()->num_rows > 0) {
-                $error = "Tag name already exists.";
-            } else {
-                $sql = "UPDATE tags SET name = ?, slug = ? WHERE id = ?";
-                $stmt = $conn->prepare($sql);
+        case 'edit':
+            $tag_id = $_POST['tag_id'];
+            $name = trim($_POST['name']);
+            if (!empty($name) && !empty($tag_id)) {
+                $slug = createSlug($name);
+                $stmt = $conn->prepare("UPDATE tags SET name = ?, slug = ? WHERE id = ?");
                 $stmt->bind_param("ssi", $name, $slug, $tag_id);
                 if ($stmt->execute()) {
                     $_SESSION['success_msg'] = "Tag updated successfully!";
-                    header('Location: manage-tags.php');
-                    exit();
                 } else {
                     $error = "Error updating tag.";
                 }
+                $stmt->close();
             }
-        }
-        elseif ($_POST['action'] === 'delete' && !empty($_POST['tag_id'])) {
-            $tag_id = (int)$_POST['tag_id'];
+            break;
             
-            // Check if tag has posts
-            $stmt = $conn->prepare("SELECT COUNT(*) as post_count FROM post_tags WHERE tag_id = ?");
-            $stmt->bind_param("i", $tag_id);
-            $stmt->execute();
-            $result = $stmt->get_result()->fetch_assoc();
-            
-            if ($result['post_count'] > 0) {
-                $error = "Cannot delete tag. It has associated posts.";
-            } else {
-                $sql = "DELETE FROM tags WHERE id = ?";
-                $stmt = $conn->prepare($sql);
+        case 'deactivate':
+            $tag_id = $_POST['tag_id'];
+            if (!empty($tag_id)) {
+                $stmt = $conn->prepare("UPDATE tags SET is_active = 0 WHERE id = ?");
                 $stmt->bind_param("i", $tag_id);
                 if ($stmt->execute()) {
-                    $_SESSION['success_msg'] = "Tag deleted successfully!";
-                    header('Location: manage-tags.php');
-                    exit();
+                    $_SESSION['success_msg'] = "Tag deactivated successfully!";
                 } else {
-                    $error = "Error deleting tag.";
+                    $error = "Error deactivating tag.";
                 }
+                $stmt->close();
             }
-        }
+            break;
     }
+    
+    // Redirect to refresh the page
+    header('Location: manage-tags.php');
+    exit;
 }
 
-// Get all tags with post count
+// Get all active tags with post count
 $sql = "SELECT t.*, COUNT(pt.post_id) as post_count 
         FROM tags t 
         LEFT JOIN post_tags pt ON t.id = pt.tag_id 
+        LEFT JOIN posts p ON pt.post_id = p.id AND p.deleted_at IS NULL
+        WHERE t.is_active = 1 AND t.deleted_at IS NULL
         GROUP BY t.id 
         ORDER BY t.name";
 $result = $conn->query($sql);
@@ -186,15 +167,13 @@ include '../includes/header.php';
                                         <td><?php echo $tag['post_count']; ?></td>
                                         <td>
                                             <button class="btn btn-primary btn-sm edit-tag">Edit</button>
-                                            <?php if ($tag['post_count'] == 0): ?>
-                                                <form action="manage-tags.php" method="post" style="display: inline;">
-                                                    <input type="hidden" name="action" value="delete">
-                                                    <input type="hidden" name="tag_id" value="<?php echo $tag['id']; ?>">
-                                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this tag?')">Delete</button>
-                                                </form>
-                                            <?php else: ?>
-                                                <button class="btn btn-danger btn-sm" disabled title="Cannot delete tag with associated posts">Delete</button>
-                                            <?php endif; ?>
+                                            <form method="POST" style="display: inline;">
+                                                <input type="hidden" name="action" value="deactivate">
+                                                <input type="hidden" name="tag_id" value="<?php echo $tag['id']; ?>">
+                                                <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Are you sure you want to deactivate this tag?');">
+                                                    Deactivate
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>

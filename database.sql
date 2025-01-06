@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) UNIQUE NOT NULL,
     phone_number VARCHAR(20) DEFAULT NULL,
     role ENUM('admin', 'author', 'user') DEFAULT 'user',
+    is_active BOOLEAN DEFAULT TRUE,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     avatar VARCHAR(255) DEFAULT NULL
 );
@@ -17,27 +19,34 @@ CREATE TABLE IF NOT EXISTS users (
 -- Categories table
 CREATE TABLE IF NOT EXISTS categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) UNIQUE NOT NULL,
-    slug VARCHAR(50) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    name VARCHAR(50) NOT NULL,
+    slug VARCHAR(50) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_name_not_deleted (name, deleted_at),
+    UNIQUE KEY unique_slug_not_deleted (slug, deleted_at)
 );
 
 -- Posts table
 CREATE TABLE IF NOT EXISTS posts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    slug VARCHAR(255) UNIQUE NOT NULL,
+    slug VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     image_path VARCHAR(255),
     category_id INT,
     author_id INT,
     status ENUM('draft', 'published') DEFAULT 'draft',
+    is_active BOOLEAN DEFAULT TRUE,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
     featured BOOLEAN DEFAULT FALSE,
     views INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
-    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE KEY unique_slug_not_deleted (slug, deleted_at)
 );
 
 -- Comments table
@@ -47,6 +56,8 @@ CREATE TABLE IF NOT EXISTS comments (
     user_id INT,
     parent_id INT DEFAULT NULL,
     content TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
@@ -67,9 +78,13 @@ CREATE TABLE IF NOT EXISTS post_views (
 -- Tags table
 CREATE TABLE IF NOT EXISTS tags (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) UNIQUE NOT NULL,
-    slug VARCHAR(50) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    name VARCHAR(50) NOT NULL,
+    slug VARCHAR(50) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_name_not_deleted (name, deleted_at),
+    UNIQUE KEY unique_slug_not_deleted (slug, deleted_at)
 );
 
 -- Post_tags relationship table
@@ -84,8 +99,11 @@ CREATE TABLE IF NOT EXISTS post_tags (
 -- Newsletter users table
 CREATE TABLE IF NOT EXISTS netpy_newsletter_users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    email VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+    subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_email_not_deleted (email, deleted_at)
 );
 
 -- Insert default admin user (password: Password)

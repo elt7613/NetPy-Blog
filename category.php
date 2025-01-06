@@ -9,8 +9,11 @@ if (empty($category_slug)) {
     exit;
 }
 
-// Get category details
-$sql = "SELECT * FROM categories WHERE slug = ?";
+// Get category info
+$sql = "SELECT * FROM categories 
+        WHERE slug = ? 
+        AND deleted_at IS NULL 
+        AND is_active = 1";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $category_slug);
 $stmt->execute();
@@ -18,7 +21,7 @@ $category = $stmt->get_result()->fetch_assoc();
 
 if (!$category) {
     header('Location: index.php');
-    exit;
+    exit();
 }
 
 // Get current page number
@@ -26,19 +29,29 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $posts_per_page = 10;
 $offset = ($page - 1) * $posts_per_page;
 
-// Get total number of posts for this category
-$count_sql = "SELECT COUNT(*) as total FROM posts p 
-              WHERE p.category_id = ? AND p.status = 'published'";
-$count_stmt = $conn->prepare($count_sql);
-$count_stmt->bind_param("i", $category['id']);
-$count_stmt->execute();
-$total_posts = $count_stmt->get_result()->fetch_assoc()['total'];
+// Get total number of posts in this category
+$count_sql = "SELECT COUNT(*) as total 
+              FROM posts p
+              LEFT JOIN categories c ON p.category_id = c.id 
+              LEFT JOIN users u ON p.author_id = u.id 
+              WHERE c.id = ? 
+              AND p.status = 'published'
+              AND p.deleted_at IS NULL 
+              AND p.is_active = 1
+              AND c.deleted_at IS NULL 
+              AND c.is_active = 1
+              AND u.deleted_at IS NULL 
+              AND u.is_active = 1";
+$stmt = $conn->prepare($count_sql);
+$stmt->bind_param("i", $category['id']);
+$stmt->execute();
+$total_posts = $stmt->get_result()->fetch_assoc()['total'];
 $total_pages = ceil($total_posts / $posts_per_page);
 
 // Ensure current page is within valid range
 $page = max(1, min($page, $total_pages));
 
-// Get posts for this category with pagination
+// Get posts with pagination
 $sql = "SELECT p.*, c.name as category_name, u.username as author_name,
         GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
         FROM posts p 
@@ -46,7 +59,15 @@ $sql = "SELECT p.*, c.name as category_name, u.username as author_name,
         LEFT JOIN users u ON p.author_id = u.id 
         LEFT JOIN post_tags pt ON p.id = pt.post_id
         LEFT JOIN tags t ON pt.tag_id = t.id
-        WHERE p.category_id = ? AND p.status = 'published'
+        WHERE c.id = ? 
+        AND p.status = 'published'
+        AND p.deleted_at IS NULL 
+        AND p.is_active = 1
+        AND c.deleted_at IS NULL 
+        AND c.is_active = 1
+        AND u.deleted_at IS NULL 
+        AND u.is_active = 1
+        AND (t.id IS NULL OR (t.deleted_at IS NULL AND t.is_active = 1))
         GROUP BY p.id 
         ORDER BY p.created_at DESC 
         LIMIT ? OFFSET ?";

@@ -8,31 +8,61 @@ if (!isLoggedIn() || !isAdmin()) {
     exit;
 }
 
-// Handle delete subscriber
-if (isset($_POST['delete_subscriber'])) {
+// Handle subscriber actions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $subscriber_id = (int)$_POST['subscriber_id'];
-    $delete_sql = "DELETE FROM netpy_newsletter_users WHERE id = ?";
-    $stmt = $conn->prepare($delete_sql);
-    $stmt->bind_param("i", $subscriber_id);
-    $stmt->execute();
-    $_SESSION['success_msg'] = "Subscriber deleted successfully.";
+    
+    if (isset($_POST['delete_subscriber'])) {
+        // Soft delete the subscriber
+        $sql = "UPDATE netpy_newsletter_users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("i", $subscriber_id);
+        if ($stmt->execute()) {
+            $_SESSION['success_msg'] = "Subscriber removed successfully.";
+        } else {
+            $_SESSION['error_msg'] = "Error removing subscriber.";
+        }
+    } elseif (isset($_POST['toggle_status'])) {
+        // Toggle subscriber active status
+        $new_status = (int)$_POST['new_status'];
+        $sql = "UPDATE netpy_newsletter_users SET is_active = ? WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ii", $new_status, $subscriber_id);
+        if ($stmt->execute()) {
+            $_SESSION['success_msg'] = $new_status ? "Subscriber activated successfully." : "Subscriber deactivated successfully.";
+        } else {
+            $_SESSION['error_msg'] = "Error updating subscriber status.";
+        }
+    }
+    
     header('Location: manage-newsletter.php');
     exit;
 }
 
-// Get search parameter
+// Get search parameter and filters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$active_filter = isset($_GET['active']) ? $_GET['active'] : '';
+$show_deleted = isset($_GET['show_deleted']) ? $_GET['show_deleted'] : '0';
 
 // Get current page number
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $subscribers_per_page = 20;
 $offset = ($page - 1) * $subscribers_per_page;
 
-// Get total number of subscribers
-$count_sql = "SELECT COUNT(*) as total FROM netpy_newsletter_users";
-if (!empty($search)) {
-    $count_sql .= " WHERE email LIKE ?";
+// Build the base SQL for counting
+$count_sql = "SELECT COUNT(*) as total FROM netpy_newsletter_users WHERE ";
+$count_sql .= $show_deleted === '1' ? "deleted_at IS NOT NULL" : "deleted_at IS NULL";
+
+// Add active filter if set
+if ($active_filter !== '') {
+    $count_sql .= " AND is_active = " . (int)$active_filter;
 }
+
+// Add search condition if provided
+if (!empty($search)) {
+    $count_sql .= " AND email LIKE ?";
+}
+
 $count_stmt = $conn->prepare($count_sql);
 if (!empty($search)) {
     $search_param = "%$search%";
@@ -45,11 +75,20 @@ $total_pages = ceil($total_subscribers / $subscribers_per_page);
 // Ensure current page is within valid range
 $page = max(1, min($page, $total_pages));
 
-// Get subscribers with search and pagination
-$sql = "SELECT * FROM netpy_newsletter_users";
-if (!empty($search)) {
-    $sql .= " WHERE email LIKE ?";
+// Build the main query
+$sql = "SELECT * FROM netpy_newsletter_users WHERE ";
+$sql .= $show_deleted === '1' ? "deleted_at IS NOT NULL" : "deleted_at IS NULL";
+
+// Add active filter if set
+if ($active_filter !== '') {
+    $sql .= " AND is_active = " . (int)$active_filter;
 }
+
+// Add search condition if provided
+if (!empty($search)) {
+    $sql .= " AND email LIKE ?";
+}
+
 $sql .= " ORDER BY subscribed_at DESC LIMIT ? OFFSET ?";
 
 $stmt = $conn->prepare($sql);
@@ -111,6 +150,15 @@ include '../includes/header.php';
                         </div>
                     <?php endif; ?>
 
+                    <?php if (isset($_SESSION['error_msg'])): ?>
+                        <div class="alert alert-danger">
+                            <?php 
+                            echo $_SESSION['error_msg'];
+                            unset($_SESSION['error_msg']);
+                            ?>
+                        </div>
+                    <?php endif; ?>
+
                     <div class="stats-box">
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <h3>Newsletter Subscribers (<?php echo $total_subscribers; ?>)</h3>
@@ -118,9 +166,18 @@ include '../includes/header.php';
                                 <form method="GET" class="form-inline">
                                     <div class="input-group">
                                         <input type="text" name="search" class="form-control" placeholder="Search by email..." value="<?php echo htmlspecialchars($search); ?>">
+                                        <select name="active" class="form-control ml-2">
+                                            <option value="">All Status</option>
+                                            <option value="1" <?php echo $active_filter === '1' ? 'selected' : ''; ?>>Active</option>
+                                            <option value="0" <?php echo $active_filter === '0' ? 'selected' : ''; ?>>Inactive</option>
+                                        </select>
+                                        <select name="show_deleted" class="form-control ml-2">
+                                            <option value="0" <?php echo $show_deleted === '0' ? 'selected' : ''; ?>>Active Subscribers</option>
+                                            <option value="1" <?php echo $show_deleted === '1' ? 'selected' : ''; ?>>Deleted Subscribers</option>
+                                        </select>
                                         <div class="input-group-append">
                                             <button type="submit" class="btn btn-primary">Search</button>
-                                            <?php if (!empty($search)): ?>
+                                            <?php if (!empty($search) || $active_filter !== '' || $show_deleted !== '0'): ?>
                                                 <a href="manage-newsletter.php" class="btn btn-secondary">Clear</a>
                                             <?php endif; ?>
                                         </div>
@@ -134,6 +191,7 @@ include '../includes/header.php';
                                 <thead>
                                     <tr>
                                         <th>Email</th>
+                                        <th>Status</th>
                                         <th>Subscribed Date</th>
                                         <th>Actions</th>
                                     </tr>
@@ -142,12 +200,29 @@ include '../includes/header.php';
                                     <?php foreach ($subscribers as $subscriber): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($subscriber['email']); ?></td>
+                                        <td>
+                                            <?php if ($subscriber['deleted_at']): ?>
+                                                <span class="badge badge-danger">Deleted</span>
+                                            <?php else: ?>
+                                                <span class="badge badge-<?php echo $subscriber['is_active'] ? 'success' : 'warning'; ?>">
+                                                    <?php echo $subscriber['is_active'] ? 'Active' : 'Inactive'; ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?php echo date('M d, Y H:i', strtotime($subscriber['subscribed_at'])); ?></td>
                                         <td>
-                                            <form action="" method="post" style="display: inline;">
-                                                <input type="hidden" name="subscriber_id" value="<?php echo $subscriber['id']; ?>">
-                                                <button type="submit" name="delete_subscriber" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to remove this subscriber?')">Remove</button>
-                                            </form>
+                                            <?php if (!$subscriber['deleted_at']): ?>
+                                                <form action="" method="post" style="display: inline;">
+                                                    <input type="hidden" name="subscriber_id" value="<?php echo $subscriber['id']; ?>">
+                                                    <input type="hidden" name="new_status" value="<?php echo $subscriber['is_active'] ? '0' : '1'; ?>">
+                                                    <button type="submit" name="toggle_status" class="btn btn-<?php echo $subscriber['is_active'] ? 'warning' : 'success'; ?> btn-sm">
+                                                        <?php echo $subscriber['is_active'] ? 'Deactivate' : 'Activate'; ?>
+                                                    </button>
+                                                    <button type="submit" name="delete_subscriber" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to remove this subscriber?')">
+                                                        Remove
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -162,12 +237,20 @@ include '../includes/header.php';
                                 <ul class="pagination">
                                     <?php if ($page > 1): ?>
                                         <li class="page-item">
-                                            <a class="page-link" href="?page=1<?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?>" aria-label="First">
+                                            <a class="page-link" href="?page=1<?php 
+                                                echo !empty($search) ? '&search='.urlencode($search) : '';
+                                                echo $active_filter !== '' ? '&active='.$active_filter : '';
+                                                echo $show_deleted !== '0' ? '&show_deleted='.$show_deleted : '';
+                                            ?>" aria-label="First">
                                                 <span aria-hidden="true">&laquo;&laquo;</span>
                                             </a>
                                         </li>
                                         <li class="page-item">
-                                            <a class="page-link" href="?page=<?php echo $page-1; ?><?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?>" aria-label="Previous">
+                                            <a class="page-link" href="?page=<?php echo $page-1; ?><?php 
+                                                echo !empty($search) ? '&search='.urlencode($search) : '';
+                                                echo $active_filter !== '' ? '&active='.$active_filter : '';
+                                                echo $show_deleted !== '0' ? '&show_deleted='.$show_deleted : '';
+                                            ?>" aria-label="Previous">
                                                 <span aria-hidden="true">&laquo;</span>
                                             </a>
                                         </li>
@@ -180,18 +263,30 @@ include '../includes/header.php';
                                     for ($i = $start_page; $i <= $end_page; $i++):
                                     ?>
                                         <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
-                                            <a class="page-link" href="?page=<?php echo $i; ?><?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?>"><?php echo $i; ?></a>
+                                            <a class="page-link" href="?page=<?php echo $i; ?><?php 
+                                                echo !empty($search) ? '&search='.urlencode($search) : '';
+                                                echo $active_filter !== '' ? '&active='.$active_filter : '';
+                                                echo $show_deleted !== '0' ? '&show_deleted='.$show_deleted : '';
+                                            ?>"><?php echo $i; ?></a>
                                         </li>
                                     <?php endfor; ?>
 
                                     <?php if ($page < $total_pages): ?>
                                         <li class="page-item">
-                                            <a class="page-link" href="?page=<?php echo $page+1; ?><?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?>" aria-label="Next">
+                                            <a class="page-link" href="?page=<?php echo $page+1; ?><?php 
+                                                echo !empty($search) ? '&search='.urlencode($search) : '';
+                                                echo $active_filter !== '' ? '&active='.$active_filter : '';
+                                                echo $show_deleted !== '0' ? '&show_deleted='.$show_deleted : '';
+                                            ?>" aria-label="Next">
                                                 <span aria-hidden="true">&raquo;</span>
                                             </a>
                                         </li>
                                         <li class="page-item">
-                                            <a class="page-link" href="?page=<?php echo $total_pages; ?><?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?>" aria-label="Last">
+                                            <a class="page-link" href="?page=<?php echo $total_pages; ?><?php 
+                                                echo !empty($search) ? '&search='.urlencode($search) : '';
+                                                echo $active_filter !== '' ? '&active='.$active_filter : '';
+                                                echo $show_deleted !== '0' ? '&show_deleted='.$show_deleted : '';
+                                            ?>" aria-label="Last">
                                                 <span aria-hidden="true">&raquo;&raquo;</span>
                                             </a>
                                         </li>

@@ -2,8 +2,36 @@
 // Get recent posts for sidebar
 $sidebar_recent_posts = getAllPosts(5, 0);
 
-// Get all tags for tag cloud
-$tags = getAllTags();
+// Get all active tags for tag cloud
+$tags_sql = "SELECT t.*, COUNT(DISTINCT pt.post_id) as post_count 
+             FROM tags t 
+             LEFT JOIN post_tags pt ON t.id = pt.tag_id 
+             LEFT JOIN posts p ON pt.post_id = p.id 
+             AND p.status = 'published' 
+             AND p.deleted_at IS NULL 
+             AND p.is_active = 1
+             WHERE t.deleted_at IS NULL 
+             AND t.is_active = 1
+             GROUP BY t.id 
+             HAVING post_count > 0 
+             ORDER BY post_count DESC, t.name";
+$tags_result = $conn->query($tags_sql);
+$tags = $tags_result ? $tags_result->fetch_all(MYSQLI_ASSOC) : [];
+
+// Get categories with post count
+$categories_sql = "SELECT c.*, COUNT(p.id) as post_count 
+                  FROM categories c 
+                  LEFT JOIN posts p ON c.id = p.category_id 
+                  AND p.status = 'published' 
+                  AND p.deleted_at IS NULL 
+                  AND p.is_active = 1
+                  WHERE c.deleted_at IS NULL 
+                  AND c.is_active = 1
+                  GROUP BY c.id 
+                  HAVING post_count > 0
+                  ORDER BY c.name";
+$categories_result = $conn->query($categories_sql);
+$categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) : [];
 ?>
 
 <div class="col-lg-4">
@@ -59,7 +87,7 @@ $tags = getAllTags();
             <div class="col-lg-12">
                 <div class="sidebar-item tags">
                     <div class="sidebar-heading">
-                        <h2>Tag Clouds</h2>
+                        <h2>Tags</h2>
                     </div>
                     <div class="content">
                         <ul class="tags">
@@ -85,37 +113,53 @@ $tags = getAllTags();
                             margin: 0;
                             display: flex;
                             flex-wrap: wrap;
-                            gap: 10px;
+                            gap: 8px;
                         }
                         .sidebar-item .tags ul.tags li {
                             margin: 0;
+                            padding: 0;
                         }
                         .sidebar-item .tags ul.tags li a {
                             display: inline-block;
-                            padding: 5px 12px;
+                            padding: 4px 12px;
                             background: #f8f9fa;
-                            color: #353935;
                             border-radius: 20px;
-                            font-size: 14px;
-                            transition: all 0.3s;
-                            text-decoration: none !important;
+                            color: #666;
+                            text-decoration: none;
+                            font-size: 13px;
+                            transition: all 0.3s ease;
                         }
-                        body .sidebar-item .tags ul.tags li a:hover,
-                        .sidebar-item .tags ul.tags li a:hover,
-                        .sidebar .sidebar-item .tags ul.tags li a:hover {
-                            background-color: #f48840 !important;
-                            color: #ffffff !important;
-                            transform: translateY(-2px);
-                            text-decoration: none !important;
+                        .sidebar-item .tags ul.tags li a:hover {
+                            background: #f48840;
+                            color: #fff;
                         }
-                        .sidebar-item .tags ul.tags li a.tag-1 { font-size: 12px; opacity: 0.85; }
-                        .sidebar-item .tags ul.tags li a.tag-2 { font-size: 14px; opacity: 0.9; }
-                        .sidebar-item .tags ul.tags li a.tag-3 { font-size: 16px; opacity: 0.95; }
-                        .sidebar-item .tags ul.tags li a.tag-4 { font-size: 18px; opacity: 1; }
-                        .sidebar-item .tags ul.tags li a.tag-5 { font-size: 20px; opacity: 1; }
+                        .sidebar-item .tags ul.tags li a.tag-1 { font-size: 12px; }
+                        .sidebar-item .tags ul.tags li a.tag-2 { font-size: 13px; }
+                        .sidebar-item .tags ul.tags li a.tag-3 { font-size: 14px; }
+                        .sidebar-item .tags ul.tags li a.tag-4 { font-size: 15px; }
+                        .sidebar-item .tags ul.tags li a.tag-5 { font-size: 16px; }
+                        
+                        /* Normalize scrollbar appearance */
+                        .sidebar::-webkit-scrollbar {
+                            width: 5px;
+                            height: 5px;  /* Added for horizontal scrollbar */
+                        }
+                        
+                        .sidebar::-webkit-scrollbar-track {
+                            background: #f1f1f1;
+                        }
+                        
+                        .sidebar::-webkit-scrollbar-thumb {
+                            background: #888;
+                            border-radius: 3px;
+                        }
+                        
+                        .sidebar::-webkit-scrollbar-thumb:hover {
+                            background: #555;
+                        }
                     </style>
                 </div>
             </div>
         </div>
     </div>
-</div> 
+</div>

@@ -12,6 +12,8 @@ if (!isLoggedIn() || !isAdmin()) {
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $search_by = isset($_GET['search_by']) ? $_GET['search_by'] : 'title';
 $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
+$active_filter = isset($_GET['active']) ? $_GET['active'] : '';
+$show_deleted = isset($_GET['show_deleted']) ? $_GET['show_deleted'] : '0';
 $date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
 $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 
@@ -20,189 +22,265 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $posts_per_page = 10;
 $offset = ($page - 1) * $posts_per_page;
 
-// Get total number of posts (for pagination)
+// Initialize parameters array and types string
+$params = array();
+$types = '';
+
+// Base count query
 $count_sql = "SELECT COUNT(DISTINCT p.id) as total FROM posts p 
               LEFT JOIN categories c ON p.category_id = c.id 
               LEFT JOIN users u ON p.author_id = u.id 
               LEFT JOIN post_tags pt ON p.id = pt.post_id
               LEFT JOIN tags t ON pt.tag_id = t.id
-              WHERE 1=1";
+              WHERE " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL");
 
-// Add search conditions to count query
+// Add conditions and parameters
+if ($active_filter !== '') {
+    $count_sql .= " AND p.is_active = ?";
+    $types .= "i";
+    $params[] = $active_filter;
+}
+
 if (!empty($search)) {
     switch ($search_by) {
         case 'title':
             $count_sql .= " AND p.title LIKE ?";
-            $search_param = "%$search%";
             break;
         case 'author':
             $count_sql .= " AND u.username LIKE ?";
-            $search_param = "%$search%";
             break;
         case 'category':
             $count_sql .= " AND c.name LIKE ?";
-            $search_param = "%$search%";
             break;
         case 'tag':
             $count_sql .= " AND t.name LIKE ?";
-            $search_param = "%$search%";
             break;
     }
+    $types .= "s";
+    $params[] = "%$search%";
 }
 
 if (!empty($date_from) && !empty($date_to)) {
     $count_sql .= " AND DATE(p.created_at) BETWEEN ? AND ?";
+    $types .= "ss";
+    $params[] = $date_from;
+    $params[] = $date_to;
 }
 
 if (!empty($status_filter)) {
     $count_sql .= " AND p.status = ?";
+    $types .= "s";
+    $params[] = $status_filter;
 }
 
+// Prepare and execute count query
 $count_stmt = $conn->prepare($count_sql);
-
-// Bind parameters for count query
-if (!empty($search) && !empty($status_filter) && !empty($date_from) && !empty($date_to)) {
-    $count_stmt->bind_param("ssss", $search_param, $date_from, $date_to, $status_filter);
-} elseif (!empty($search) && !empty($date_from) && !empty($date_to)) {
-    $count_stmt->bind_param("sss", $search_param, $date_from, $date_to);
-} elseif (!empty($search) && !empty($status_filter)) {
-    $count_stmt->bind_param("ss", $search_param, $status_filter);
-} elseif (!empty($date_from) && !empty($date_to) && !empty($status_filter)) {
-    $count_stmt->bind_param("sss", $date_from, $date_to, $status_filter);
-} elseif (!empty($search)) {
-    $count_stmt->bind_param("s", $search_param);
-} elseif (!empty($date_from) && !empty($date_to)) {
-    $count_stmt->bind_param("ss", $date_from, $date_to);
-} elseif (!empty($status_filter)) {
-    $count_stmt->bind_param("s", $status_filter);
+if (!empty($params)) {
+    $count_stmt->bind_param($types, ...$params);
 }
-
 $count_stmt->execute();
-$total_posts = $count_stmt->get_result()->fetch_assoc()['total'];
+$result = $count_stmt->get_result();
+$total_posts = $result->fetch_assoc()['total'];
 $total_pages = ceil($total_posts / $posts_per_page);
+$count_stmt->close();
 
 // Ensure current page is within valid range
 $page = max(1, min($page, $total_pages));
 
-// Get post statistics
-$sql = "SELECT 
-            COUNT(*) as total_posts,
-            SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) as published_posts,
-            SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_posts,
-            SUM(CASE WHEN featured = 1 THEN 1 ELSE 0 END) as featured_posts
-        FROM posts";
-$stats = $conn->query($sql)->fetch_assoc();
+// Reset parameters for main query
+$params = array();
+$types = '';
 
-// Get user statistics
-$sql = "SELECT 
-            COUNT(*) as total_users,
-            SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) as admin_users,
-            SUM(CASE WHEN role = 'author' THEN 1 ELSE 0 END) as author_users,
-            SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) as normal_users
-        FROM users";
-$user_stats = $conn->query($sql)->fetch_assoc();
-
-// Get recent posts with search
-$sql = "SELECT DISTINCT p.*, c.name as category_name, u.username as author_name,
+// Base main query
+$sql = "SELECT p.*, c.name as category_name, u.username as author_name,
         GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
         FROM posts p 
         LEFT JOIN categories c ON p.category_id = c.id 
         LEFT JOIN users u ON p.author_id = u.id 
         LEFT JOIN post_tags pt ON p.id = pt.post_id
         LEFT JOIN tags t ON pt.tag_id = t.id
-        WHERE 1=1";
+        WHERE " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL");
 
-// Add search conditions
+// Add conditions and parameters
+if ($active_filter !== '') {
+    $sql .= " AND p.is_active = ?";
+    $types .= "i";
+    $params[] = $active_filter;
+}
+
 if (!empty($search)) {
     switch ($search_by) {
         case 'title':
             $sql .= " AND p.title LIKE ?";
-            $search_param = "%$search%";
             break;
         case 'author':
             $sql .= " AND u.username LIKE ?";
-            $search_param = "%$search%";
             break;
         case 'category':
             $sql .= " AND c.name LIKE ?";
-            $search_param = "%$search%";
             break;
         case 'tag':
             $sql .= " AND t.name LIKE ?";
-            $search_param = "%$search%";
             break;
     }
+    $types .= "s";
+    $params[] = "%$search%";
 }
 
-// Add date range filter
 if (!empty($date_from) && !empty($date_to)) {
     $sql .= " AND DATE(p.created_at) BETWEEN ? AND ?";
+    $types .= "ss";
+    $params[] = $date_from;
+    $params[] = $date_to;
 }
 
-// Add status filter
 if (!empty($status_filter)) {
     $sql .= " AND p.status = ?";
+    $types .= "s";
+    $params[] = $status_filter;
 }
 
 $sql .= " GROUP BY p.id ORDER BY p.created_at DESC LIMIT ? OFFSET ?";
+$types .= "ii";
+$params[] = $posts_per_page;
+$params[] = $offset;
 
-// Prepare and execute the query
+// Prepare and execute main query
 $stmt = $conn->prepare($sql);
-
-// Bind parameters based on filters with LIMIT and OFFSET
-if (!empty($search) && !empty($status_filter) && !empty($date_from) && !empty($date_to)) {
-    $stmt->bind_param("ssssii", $search_param, $date_from, $date_to, $status_filter, $posts_per_page, $offset);
-} elseif (!empty($search) && !empty($date_from) && !empty($date_to)) {
-    $stmt->bind_param("sssii", $search_param, $date_from, $date_to, $posts_per_page, $offset);
-} elseif (!empty($search) && !empty($status_filter)) {
-    $stmt->bind_param("ssii", $search_param, $status_filter, $posts_per_page, $offset);
-} elseif (!empty($date_from) && !empty($date_to) && !empty($status_filter)) {
-    $stmt->bind_param("sssii", $date_from, $date_to, $status_filter, $posts_per_page, $offset);
-} elseif (!empty($search)) {
-    $stmt->bind_param("sii", $search_param, $posts_per_page, $offset);
-} elseif (!empty($date_from) && !empty($date_to)) {
-    $stmt->bind_param("ssii", $date_from, $date_to, $posts_per_page, $offset);
-} elseif (!empty($status_filter)) {
-    $stmt->bind_param("sii", $status_filter, $posts_per_page, $offset);
-} else {
-    $stmt->bind_param("ii", $posts_per_page, $offset);
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
 }
-
 $stmt->execute();
-$recent_posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
+// Get post statistics
+$stats_stmt = $conn->prepare("SELECT 
+            COUNT(*) as total_posts,
+            SUM(CASE WHEN status = 'published' AND is_active = 1 THEN 1 ELSE 0 END) as published_posts,
+            SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_posts,
+            SUM(CASE WHEN featured = 1 AND is_active = 1 THEN 1 ELSE 0 END) as featured_posts
+        FROM posts 
+        WHERE deleted_at IS NULL");
+$stats_stmt->execute();
+$stats = $stats_stmt->get_result()->fetch_assoc();
+$stats_stmt->close();
+
+// Get user statistics
+$user_stats_stmt = $conn->prepare("SELECT 
+            COUNT(*) as total_users,
+            SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) as admin_users,
+            SUM(CASE WHEN role = 'author' THEN 1 ELSE 0 END) as author_users,
+            SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) as normal_users
+        FROM users 
+        WHERE deleted_at IS NULL 
+        AND is_active = 1");
+$user_stats_stmt->execute();
+$user_stats = $user_stats_stmt->get_result()->fetch_assoc();
+$user_stats_stmt->close();
 
 // Get total posts count
-$total_posts_sql = "SELECT COUNT(*) as total FROM posts";
-$total_posts = $conn->query($total_posts_sql)->fetch_assoc()['total'];
+$posts_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL");
+$posts_count_stmt->execute();
+$total_posts = $posts_count_stmt->get_result()->fetch_assoc()['total'];
+$posts_count_stmt->close();
 
 // Get published posts count
-$published_posts_sql = "SELECT COUNT(*) as total FROM posts WHERE status = 'published'";
-$published_posts = $conn->query($published_posts_sql)->fetch_assoc()['total'];
+$published_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM posts 
+                       WHERE status = 'published' 
+                       AND deleted_at IS NULL 
+                       AND is_active = 1");
+$published_count_stmt->execute();
+$published_posts = $published_count_stmt->get_result()->fetch_assoc()['total'];
+$published_count_stmt->close();
 
 // Get draft posts count
-$draft_posts_sql = "SELECT COUNT(*) as total FROM posts WHERE status = 'draft'";
-$draft_posts = $conn->query($draft_posts_sql)->fetch_assoc()['total'];
+$draft_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM posts 
+                    WHERE status = 'draft' 
+                    AND deleted_at IS NULL");
+$draft_count_stmt->execute();
+$draft_posts = $draft_count_stmt->get_result()->fetch_assoc()['total'];
+$draft_count_stmt->close();
 
-// Get total comments count
-$total_comments_sql = "SELECT COUNT(*) as total FROM comments";
-$total_comments = $conn->query($total_comments_sql)->fetch_assoc()['total'];
+// Get total users count
+$users_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM users 
+                    WHERE deleted_at IS NULL 
+                    AND is_active = 1");
+$users_count_stmt->execute();
+$total_users = $users_count_stmt->get_result()->fetch_assoc()['total'];
+$users_count_stmt->close();
 
-// Get newsletter subscribers count
-$newsletter_count_sql = "SELECT COUNT(*) as total FROM netpy_newsletter_users";
-$total_subscribers = $conn->query($newsletter_count_sql)->fetch_assoc()['total'];
+// Get total categories count
+$categories_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM categories 
+                        WHERE deleted_at IS NULL 
+                        AND is_active = 1");
+$categories_count_stmt->execute();
+$total_categories = $categories_count_stmt->get_result()->fetch_assoc()['total'];
+$categories_count_stmt->close();
 
-// Get recent newsletter subscribers
-$recent_subscribers_sql = "SELECT * FROM netpy_newsletter_users ORDER BY subscribed_at DESC LIMIT 10";
-$recent_subscribers = $conn->query($recent_subscribers_sql)->fetch_all(MYSQLI_ASSOC);
+// Get total tags count
+$tags_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM tags 
+                   WHERE deleted_at IS NULL 
+                   AND is_active = 1");
+$tags_count_stmt->execute();
+$total_tags = $tags_count_stmt->get_result()->fetch_assoc()['total'];
+$tags_count_stmt->close();
+
+// Get total newsletter subscribers count
+$subscribers_count_stmt = $conn->prepare("SELECT COUNT(*) as total 
+                                        FROM netpy_newsletter_users 
+                                        WHERE deleted_at IS NULL 
+                                        AND is_active = 1");
+$subscribers_count_stmt->execute();
+$total_subscribers = $subscribers_count_stmt->get_result()->fetch_assoc()['total'];
+$subscribers_count_stmt->close();
+
+// Get recent posts
+$recent_posts_stmt = $conn->prepare("SELECT p.*, c.name as category_name, u.username as author_name,
+                     GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
+                     FROM posts p 
+                     LEFT JOIN categories c ON p.category_id = c.id 
+                     LEFT JOIN users u ON p.author_id = u.id 
+                     LEFT JOIN post_tags pt ON p.id = pt.post_id
+                     LEFT JOIN tags t ON pt.tag_id = t.id
+                     WHERE p.deleted_at IS NULL 
+                     AND c.deleted_at IS NULL 
+                     AND c.is_active = 1
+                     AND u.deleted_at IS NULL 
+                     AND u.is_active = 1
+                     GROUP BY p.id, c.name, u.username
+                     ORDER BY p.created_at DESC 
+                     LIMIT 10");
+$recent_posts_stmt->execute();
+$recent_posts = $recent_posts_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$recent_posts_stmt->close();
 
 // Get recent comments
-$recent_comments_sql = "SELECT c.*, p.title as post_title, u.username 
+$recent_comments_stmt = $conn->prepare("SELECT c.*, p.title as post_title, u.username 
                        FROM comments c 
                        LEFT JOIN posts p ON c.post_id = p.id 
                        LEFT JOIN users u ON c.user_id = u.id 
+                       WHERE c.deleted_at IS NULL 
+                       AND c.is_active = 1
+                       AND p.deleted_at IS NULL 
+                       AND p.is_active = 1
+                       AND u.deleted_at IS NULL 
+                       AND u.is_active = 1
                        ORDER BY c.created_at DESC 
-                       LIMIT 5";
-$recent_comments = $conn->query($recent_comments_sql)->fetch_all(MYSQLI_ASSOC);
+                       LIMIT 5");
+$recent_comments_stmt->execute();
+$recent_comments = $recent_comments_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$recent_comments_stmt->close();
+
+// Get recent subscribers
+$recent_subscribers_stmt = $conn->prepare("SELECT * FROM netpy_newsletter_users 
+                                         WHERE deleted_at IS NULL 
+                                         AND is_active = 1 
+                                         ORDER BY subscribed_at DESC 
+                                         LIMIT 5");
+$recent_subscribers_stmt->execute();
+$recent_subscribers = $recent_subscribers_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$recent_subscribers_stmt->close();
 
 $page_title = "Dashboard";
 include '../includes/header.php';
@@ -357,8 +435,8 @@ include '../includes/header.php';
                                     <div class="mb-4">
                                         <form method="GET" class="form-inline">
                                             <div class="row w-100">
-                                                <div class="col-md-3">
-                                                    <input type="text" name="search" class="form-control" placeholder="Search posts..." value="<?php echo htmlspecialchars($search); ?>">
+                                                <div class="col-md-2">
+                                                    <input type="text" name="search" class="form-control" placeholder="Search..." value="<?php echo htmlspecialchars($search); ?>">
                                                 </div>
                                                 <div class="col-md-2">
                                                     <select name="search_by" class="form-control">
@@ -373,6 +451,19 @@ include '../includes/header.php';
                                                         <option value="">All Status</option>
                                                         <option value="published" <?php echo $status_filter === 'published' ? 'selected' : ''; ?>>Published</option>
                                                         <option value="draft" <?php echo $status_filter === 'draft' ? 'selected' : ''; ?>>Draft</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <select name="active" class="form-control">
+                                                        <option value="">All Posts</option>
+                                                        <option value="1" <?php echo $active_filter === '1' ? 'selected' : ''; ?>>Active</option>
+                                                        <option value="0" <?php echo $active_filter === '0' ? 'selected' : ''; ?>>Inactive</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <select name="show_deleted" class="form-control">
+                                                        <option value="0" <?php echo $show_deleted === '0' ? 'selected' : ''; ?>>Active Posts</option>
+                                                        <option value="1" <?php echo $show_deleted === '1' ? 'selected' : ''; ?>>Deleted Posts</option>
                                                     </select>
                                                 </div>
                                                 <div class="col-md-2">
@@ -437,12 +528,23 @@ include '../includes/header.php';
                                                     </td>
                                                     <td><?php echo date('M j, Y', strtotime($post['created_at'])); ?></td>
                                                     <td>
-                                                        <a href="edit-post.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-primary">Edit</a>
-                                                        <a href="../post-details.php?slug=<?php echo $post['slug']; ?>" class="btn btn-sm btn-info" target="_blank">View</a>
-                                                        <form action="delete-post.php" method="post" style="display: inline;">
-                                                            <input type="hidden" name="post_id" value="<?php echo $post['id']; ?>">
-                                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this post?')">Delete</button>
-                                                        </form>
+                                                        <?php if ($show_deleted === '0'): ?>
+                                                            <form method="POST" action="delete-post.php" style="display: inline;">
+                                                                <input type="hidden" name="post_id" value="<?php echo $post['id']; ?>">
+                                                                <input type="hidden" name="new_status" value="<?php echo $post['is_active'] ? '0' : '1'; ?>">
+                                                                <a href="edit-post.php?id=<?php echo $post['id']; ?>" class="btn btn-primary btn-sm">
+                                                                    Edit
+                                                                </a>
+                                                                <button type="submit" name="toggle_status" class="btn btn-<?php echo $post['is_active'] ? 'warning' : 'success'; ?> btn-sm">
+                                                                    <?php echo $post['is_active'] ? 'Deactivate' : 'Activate'; ?>
+                                                                </button>
+                                                                <button type="submit" name="delete_post" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this post?');">
+                                                                    Delete
+                                                                </button>
+                                                            </form>
+                                                        <?php else: ?>
+                                                            <span class="badge badge-danger">Deleted</span>
+                                                        <?php endif; ?>
                                                     </td>
                                                 </tr>
                                                 <?php endforeach; ?>

@@ -29,10 +29,10 @@ if (!$post) {
 }
 
 // Get categories for the dropdown
-$categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+$categories = $conn->query("SELECT * FROM categories WHERE deleted_at IS NULL AND is_active = 1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 
 // Get tags for the dropdown
-$tags = $conn->query("SELECT * FROM tags ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+$tags = $conn->query("SELECT * FROM tags WHERE deleted_at IS NULL AND is_active = 1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 
 // Get current post tags
 $stmt = $conn->prepare("SELECT tag_id FROM post_tags WHERE post_id = ?");
@@ -122,8 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt->execute()) {
             // Check if status changed from draft to published
             if ($status === 'published' && $post['status'] === 'draft') {
-                // Get all newsletter subscribers
-                $subscriber_sql = "SELECT email FROM netpy_newsletter_users";
+                // Get all active newsletter subscribers
+                $subscriber_sql = "SELECT email FROM netpy_newsletter_users WHERE deleted_at IS NULL AND is_active = 1";
                 $subscriber_result = $conn->query($subscriber_sql);
                 
                 if ($subscriber_result->num_rows > 0) {

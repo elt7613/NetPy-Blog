@@ -4,58 +4,89 @@ require_once 'functions.php';
 
 // Get search query
 $query = isset($_GET['q']) ? sanitizeInput($_GET['q']) : '';
+$error = null;
+$total_posts = 0;
+$total_pages = 0;
+$posts = array();
 
-// Get current page number
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$posts_per_page = 10;
-$offset = ($page - 1) * $posts_per_page;
+// Validate query length and content
+if (empty($query)) {
+    $error = "Please enter a search term.";
+} else {
+    // Get current page number
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $posts_per_page = 10;
+    $offset = ($page - 1) * $posts_per_page;
 
-// Get total number of search results
-$count_sql = "SELECT COUNT(DISTINCT p.id) as total 
-              FROM posts p 
-              LEFT JOIN categories c ON p.category_id = c.id 
-              LEFT JOIN users u ON p.author_id = u.id 
-              LEFT JOIN post_tags pt ON p.id = pt.post_id
-              LEFT JOIN tags t ON pt.tag_id = t.id
-              WHERE p.status = 'published' AND (
-                  p.title LIKE ? OR 
-                  p.content LIKE ? OR 
-                  c.name LIKE ? OR 
-                  t.name LIKE ?
-              )";
+    try {
+        // Get total number of matching posts
+        $count_sql = "SELECT COUNT(DISTINCT p.id) as total 
+                  FROM posts p
+                  LEFT JOIN categories c ON p.category_id = c.id 
+                  LEFT JOIN users u ON p.author_id = u.id 
+                  LEFT JOIN post_tags pt ON p.id = pt.post_id
+                  LEFT JOIN tags t ON pt.tag_id = t.id
+                  WHERE p.status = 'published'
+                  AND p.deleted_at IS NULL 
+                  AND p.is_active = 1
+                  AND (c.id IS NULL OR (c.deleted_at IS NULL AND c.is_active = 1))
+                  AND (u.id IS NULL OR (u.deleted_at IS NULL AND u.is_active = 1))
+                  AND (t.id IS NULL OR (t.deleted_at IS NULL AND t.is_active = 1))
+                  AND (
+                      p.title LIKE ? 
+                      OR p.content LIKE ? 
+                      OR c.name LIKE ? 
+                      OR u.username LIKE ?
+                      OR t.name LIKE ?
+                  )";
+        $stmt = $conn->prepare($count_sql);
+        $search_param = "%$query%";
+        $stmt->bind_param("sssss", $search_param, $search_param, $search_param, $search_param, $search_param);
+        $stmt->execute();
+        $total_posts = $stmt->get_result()->fetch_assoc()['total'];
+        $total_pages = ceil($total_posts / $posts_per_page);
+        $stmt->close();
 
-$search_param = "%$query%";
-$count_stmt = $conn->prepare($count_sql);
-$count_stmt->bind_param("ssss", $search_param, $search_param, $search_param, $search_param);
-$count_stmt->execute();
-$total_posts = $count_stmt->get_result()->fetch_assoc()['total'];
-$total_pages = ceil($total_posts / $posts_per_page);
+        // Ensure current page is within valid range
+        $page = max(1, min($page, $total_pages));
 
-// Ensure current page is within valid range
-$page = max(1, min($page, $total_pages));
+        if ($total_posts > 0) {
+            // Get search results with pagination
+            $sql = "SELECT p.*, c.name as category_name, u.username as author_name,
+                    GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
+                    FROM posts p 
+                    LEFT JOIN categories c ON p.category_id = c.id 
+                    LEFT JOIN users u ON p.author_id = u.id 
+                    LEFT JOIN post_tags pt ON p.id = pt.post_id
+                    LEFT JOIN tags t ON pt.tag_id = t.id
+                    WHERE p.status = 'published'
+                    AND p.deleted_at IS NULL 
+                    AND p.is_active = 1
+                    AND (c.id IS NULL OR (c.deleted_at IS NULL AND c.is_active = 1))
+                    AND (u.id IS NULL OR (u.deleted_at IS NULL AND u.is_active = 1))
+                    AND (t.id IS NULL OR (t.deleted_at IS NULL AND t.is_active = 1))
+                    AND (
+                        p.title LIKE ? 
+                        OR p.content LIKE ? 
+                        OR c.name LIKE ? 
+                        OR u.username LIKE ?
+                        OR t.name LIKE ?
+                    )
+                    GROUP BY p.id 
+                    ORDER BY p.created_at DESC 
+                    LIMIT ? OFFSET ?";
 
-// Get search results with pagination
-$sql = "SELECT DISTINCT p.*, c.name as category_name, u.username as author_name,
-        GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
-        FROM posts p 
-        LEFT JOIN categories c ON p.category_id = c.id 
-        LEFT JOIN users u ON p.author_id = u.id 
-        LEFT JOIN post_tags pt ON p.id = pt.post_id
-        LEFT JOIN tags t ON pt.tag_id = t.id
-        WHERE p.status = 'published' AND (
-            p.title LIKE ? OR 
-            p.content LIKE ? OR 
-            c.name LIKE ? OR 
-            t.name LIKE ?
-        )
-        GROUP BY p.id 
-        ORDER BY p.created_at DESC 
-        LIMIT ? OFFSET ?";
-
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("ssssii", $search_param, $search_param, $search_param, $search_param, $posts_per_page, $offset);
-$stmt->execute();
-$posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("sssssii", $search_param, $search_param, $search_param, $search_param, $search_param, $posts_per_page, $offset);
+            $stmt->execute();
+            $posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+        }
+    } catch (Exception $e) {
+        error_log("Search error: " . $e->getMessage());
+        $error = "An error occurred while performing the search. Please try again.";
+    }
+}
 
 // Get categories for sidebar
 $categories = getAllCategories();
@@ -105,7 +136,11 @@ $categories = getAllCategories();
                     <div class="col-lg-12">
                         <div class="text-content">
                             <h4>Search Results</h4>
-                            <h2>Found <?php echo count($posts); ?> results for "<?php echo htmlspecialchars($query); ?>"</h2>
+                            <?php if ($error): ?>
+                                <h2><?php echo htmlspecialchars($error); ?></h2>
+                            <?php else: ?>
+                                <h2>Found <?php echo $total_posts; ?> results for "<?php echo htmlspecialchars($query); ?>"</h2>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -119,11 +154,15 @@ $categories = getAllCategories();
                 <div class="col-lg-8">
                     <div class="all-blog-posts">
                         <div class="row">
-                            <?php if (empty($posts)): ?>
+                            <?php if ($error || empty($posts)): ?>
                             <div class="col-lg-12">
                                 <div class="blog-post">
                                     <div class="down-content">
-                                        <p>No results found for your search query. Please try different keywords.</p>
+                                        <?php if ($error): ?>
+                                            <p><?php echo htmlspecialchars($error); ?></p>
+                                        <?php else: ?>
+                                            <p>No results found for your search query. Please try different keywords.</p>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>

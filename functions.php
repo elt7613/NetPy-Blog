@@ -9,6 +9,12 @@ function getAllPosts($limit = 10, $offset = 0) {
             LEFT JOIN categories c ON p.category_id = c.id 
             LEFT JOIN users u ON p.author_id = u.id 
             WHERE p.status = 'published' 
+            AND p.deleted_at IS NULL 
+            AND p.is_active = 1
+            AND c.deleted_at IS NULL 
+            AND c.is_active = 1
+            AND u.deleted_at IS NULL 
+            AND u.is_active = 1
             ORDER BY p.created_at DESC 
             LIMIT ? OFFSET ?";
     
@@ -24,7 +30,14 @@ function getPostBySlug($slug) {
             FROM posts p 
             LEFT JOIN categories c ON p.category_id = c.id 
             LEFT JOIN users u ON p.author_id = u.id 
-            WHERE p.slug = ? AND p.status = 'published'";
+            WHERE p.slug = ? 
+            AND p.status = 'published'
+            AND p.deleted_at IS NULL 
+            AND p.is_active = 1
+            AND c.deleted_at IS NULL 
+            AND c.is_active = 1
+            AND u.deleted_at IS NULL 
+            AND u.is_active = 1";
     
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("s", $slug);
@@ -38,7 +51,14 @@ function getFeaturedPosts($limit = 5) {
             FROM posts p 
             LEFT JOIN categories c ON p.category_id = c.id 
             LEFT JOIN users u ON p.author_id = u.id 
-            WHERE p.status = 'published' AND p.featured = 1 
+            WHERE p.status = 'published' 
+            AND p.featured = 1 
+            AND p.deleted_at IS NULL 
+            AND p.is_active = 1
+            AND c.deleted_at IS NULL 
+            AND c.is_active = 1
+            AND u.deleted_at IS NULL 
+            AND u.is_active = 1
             ORDER BY p.created_at DESC 
             LIMIT ?";
     
@@ -51,7 +71,10 @@ function getFeaturedPosts($limit = 5) {
 // Category functions
 function getAllCategories() {
     global $conn;
-    $sql = "SELECT * FROM categories ORDER BY name";
+    $sql = "SELECT * FROM categories 
+            WHERE deleted_at IS NULL 
+            AND is_active = 1 
+            ORDER BY name";
     $result = $conn->query($sql);
     return $result->fetch_all(MYSQLI_ASSOC);
 }
@@ -62,7 +85,14 @@ function getPostsByCategory($category_slug, $limit = 10, $offset = 0) {
             FROM posts p 
             LEFT JOIN categories c ON p.category_id = c.id 
             LEFT JOIN users u ON p.author_id = u.id 
-            WHERE c.slug = ? AND p.status = 'published' 
+            WHERE c.slug = ? 
+            AND p.status = 'published' 
+            AND p.deleted_at IS NULL 
+            AND p.is_active = 1
+            AND c.deleted_at IS NULL 
+            AND c.is_active = 1
+            AND u.deleted_at IS NULL 
+            AND u.is_active = 1
             ORDER BY p.created_at DESC 
             LIMIT ? OFFSET ?";
     
@@ -79,6 +109,9 @@ function getPostComments($post_id) {
             FROM comments c 
             LEFT JOIN users u ON c.user_id = u.id 
             WHERE c.post_id = ? 
+            AND c.deleted_at IS NULL 
+            AND c.is_active = 1
+            AND (u.id IS NULL OR (u.deleted_at IS NULL AND u.is_active = 1))
             ORDER BY c.created_at DESC";
     
     $stmt = $conn->prepare($sql);
@@ -89,7 +122,8 @@ function getPostComments($post_id) {
 
 function addComment($post_id, $user_id, $content, $parent_id = null) {
     global $conn;
-    $sql = "INSERT INTO comments (post_id, user_id, content, parent_id) VALUES (?, ?, ?, ?)";
+    $sql = "INSERT INTO comments (post_id, user_id, content, parent_id, is_active) 
+            VALUES (?, ?, ?, ?, 1)";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("iisi", $post_id, $user_id, $content, $parent_id);
     return $stmt->execute();
@@ -98,11 +132,15 @@ function addComment($post_id, $user_id, $content, $parent_id = null) {
 // User functions
 function loginUser($username, $password) {
     global $conn;
-    $sql = "SELECT * FROM users WHERE username = ?";
+    $sql = "SELECT * FROM users 
+            WHERE username = ? 
+            AND deleted_at IS NULL 
+            AND is_active = 1";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("s", $username);
     $stmt->execute();
     $user = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
     
     // Debug logging
     error_log("Login attempt for username: " . $username);
@@ -113,11 +151,17 @@ function loginUser($username, $password) {
         error_log("Password verification result: " . ($passwordVerified ? "Success" : "Failed"));
         
         if ($passwordVerified) {
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            error_log("Login successful for user: " . $username);
-            return true;
+            // Additional check for active status
+            if ($user['is_active'] == 1 && $user['deleted_at'] === null) {
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = $user['role'];
+                error_log("Login successful for user: " . $username);
+                return true;
+            } else {
+                error_log("Login failed: User account is deactivated or deleted");
+                return false;
+            }
         }
     }
     error_log("Login failed for user: " . $username);
@@ -165,12 +209,42 @@ function getAllTags() {
     $sql = "SELECT t.*, COUNT(DISTINCT pt.post_id) as post_count 
             FROM tags t 
             LEFT JOIN post_tags pt ON t.id = pt.tag_id 
-            LEFT JOIN posts p ON pt.post_id = p.id AND p.status = 'published'
+            LEFT JOIN posts p ON pt.post_id = p.id 
+            AND p.status = 'published'
+            AND p.deleted_at IS NULL 
+            AND p.is_active = 1
+            WHERE t.deleted_at IS NULL 
+            AND t.is_active = 1
             GROUP BY t.id 
             HAVING post_count > 0
             ORDER BY post_count DESC, t.name ASC";
             
     $result = $conn->query($sql);
-    return $result->fetch_all(MYSQLI_ASSOC);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+// Function to insert tags for a post
+function insertPostTags($post_id, $tag_ids) {
+    global $conn;
+    
+    // First, delete any existing tags for this post
+    $delete_sql = "DELETE FROM post_tags WHERE post_id = ?";
+    $delete_stmt = $conn->prepare($delete_sql);
+    $delete_stmt->bind_param("i", $post_id);
+    $delete_stmt->execute();
+    $delete_stmt->close();
+    
+    // Then insert the new tags
+    if (!empty($tag_ids)) {
+        $insert_sql = "INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)";
+        $insert_stmt = $conn->prepare($insert_sql);
+        $insert_stmt->bind_param("ii", $post_id, $tag_id);
+        
+        foreach ($tag_ids as $tag_id) {
+            $insert_stmt->execute();
+        }
+        
+        $insert_stmt->close();
+    }
 }
 ?> 

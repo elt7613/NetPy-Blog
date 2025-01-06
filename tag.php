@@ -9,8 +9,11 @@ if (empty($tag_slug)) {
     exit;
 }
 
-// Get tag details
-$sql = "SELECT * FROM tags WHERE slug = ?";
+// Get tag info
+$sql = "SELECT * FROM tags 
+        WHERE slug = ? 
+        AND deleted_at IS NULL 
+        AND is_active = 1";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $tag_slug);
 $stmt->execute();
@@ -18,7 +21,7 @@ $tag = $stmt->get_result()->fetch_assoc();
 
 if (!$tag) {
     header('Location: index.php');
-    exit;
+    exit();
 }
 
 // Get current page number
@@ -26,38 +29,59 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $posts_per_page = 10;
 $offset = ($page - 1) * $posts_per_page;
 
-// Get total number of posts for this tag
+// Get total number of posts with this tag
 $count_sql = "SELECT COUNT(DISTINCT p.id) as total 
-              FROM posts p 
-              JOIN post_tags pt ON p.id = pt.post_id 
-              JOIN tags t ON pt.tag_id = t.id 
-              WHERE t.slug = ? AND p.status = 'published'";
-$count_stmt = $conn->prepare($count_sql);
-$count_stmt->bind_param("s", $tag_slug);
-$count_stmt->execute();
-$total_posts = $count_stmt->get_result()->fetch_assoc()['total'];
+              FROM posts p
+              LEFT JOIN post_tags pt ON p.id = pt.post_id
+              LEFT JOIN tags t ON pt.tag_id = t.id
+              LEFT JOIN categories c ON p.category_id = c.id 
+              LEFT JOIN users u ON p.author_id = u.id 
+              WHERE t.id = ? 
+              AND p.status = 'published'
+              AND p.deleted_at IS NULL 
+              AND p.is_active = 1
+              AND t.deleted_at IS NULL 
+              AND t.is_active = 1
+              AND c.deleted_at IS NULL 
+              AND c.is_active = 1
+              AND u.deleted_at IS NULL 
+              AND u.is_active = 1";
+$stmt = $conn->prepare($count_sql);
+$stmt->bind_param("i", $tag['id']);
+$stmt->execute();
+$total_posts = $stmt->get_result()->fetch_assoc()['total'];
 $total_pages = ceil($total_posts / $posts_per_page);
 
 // Ensure current page is within valid range
 $page = max(1, min($page, $total_pages));
 
-// Get posts for this tag with pagination
-$sql = "SELECT DISTINCT p.*, c.name as category_name, u.username as author_name,
+// Get posts with pagination
+$sql = "SELECT p.*, c.name as category_name, u.username as author_name,
         GROUP_CONCAT(DISTINCT t2.name ORDER BY t2.name ASC SEPARATOR ', ') as post_tags 
         FROM posts p 
-        JOIN post_tags pt ON p.id = pt.post_id 
-        JOIN tags t ON pt.tag_id = t.id 
+        LEFT JOIN post_tags pt ON p.id = pt.post_id
+        LEFT JOIN tags t ON pt.tag_id = t.id
         LEFT JOIN categories c ON p.category_id = c.id 
         LEFT JOIN users u ON p.author_id = u.id 
         LEFT JOIN post_tags pt2 ON p.id = pt2.post_id
         LEFT JOIN tags t2 ON pt2.tag_id = t2.id
-        WHERE t.slug = ? AND p.status = 'published'
+        WHERE t.id = ? 
+        AND p.status = 'published'
+        AND p.deleted_at IS NULL 
+        AND p.is_active = 1
+        AND t.deleted_at IS NULL 
+        AND t.is_active = 1
+        AND c.deleted_at IS NULL 
+        AND c.is_active = 1
+        AND u.deleted_at IS NULL 
+        AND u.is_active = 1
+        AND (t2.id IS NULL OR (t2.deleted_at IS NULL AND t2.is_active = 1))
         GROUP BY p.id 
         ORDER BY p.created_at DESC 
         LIMIT ? OFFSET ?";
 
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("sii", $tag_slug, $posts_per_page, $offset);
+$stmt->bind_param("iii", $tag['id'], $posts_per_page, $offset);
 $stmt->execute();
 $posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
@@ -148,7 +172,9 @@ $categories = getAllCategories();
                                                                 $sql = "SELECT t.name, t.slug 
                                                                         FROM tags t 
                                                                         JOIN post_tags pt ON t.id = pt.tag_id 
-                                                                        WHERE pt.post_id = ?";
+                                                                        WHERE pt.post_id = ?
+                                                                        AND t.deleted_at IS NULL 
+                                                                        AND t.is_active = 1";
                                                                 $stmt = $conn->prepare($sql);
                                                                 $stmt->bind_param("i", $post['id']);
                                                                 $stmt->execute();
