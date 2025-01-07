@@ -248,15 +248,28 @@ $categories = getAllCategories();
     <link rel="stylesheet" href="assets/css/owl.css">
     <link rel="stylesheet" href="assets/css/accordions.js">
     <style>
+        .post-share {
+            position: relative;
+        }
         .share-menu {
             min-width: 200px;
             padding: 10px 0;
+            position: absolute;
+            bottom: unset !important;
+            top: -10px !important;
+            right: 0;
+            transform: translateY(-100%) !important;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 1050;
         }
         .share-menu .dropdown-item {
             padding: 8px 20px;
             color: #333;
             font-size: 14px;
             transition: all 0.3s ease;
+            white-space: nowrap;
         }
         .share-menu .dropdown-item i {
             width: 25px;
@@ -278,6 +291,42 @@ $categories = getAllCategories();
         }
         .share-menu .dropdown-divider {
             margin: 5px 0;
+        }
+
+        /* Mobile styles for share dropdown */
+        @media (max-width: 767px) {
+            .share-menu {
+                position: fixed !important;
+                top: 50% !important;
+                left: 50% !important;
+                bottom: auto !important;
+                right: auto !important;
+                transform: translate(-50%, -50%) !important;
+                width: 90% !important;
+                max-width: 300px !important;
+                margin: 0 !important;
+                background: white !important;
+                z-index: 1050 !important;
+                border-radius: 8px !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+            }
+            .share-menu .dropdown-item {
+                padding: 12px 20px !important;
+                font-size: 16px !important;
+            }
+            .share-menu .dropdown-item i {
+                width: 30px !important;
+                font-size: 18px !important;
+            }
+            .dropdown-backdrop {
+                position: fixed;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                left: 0;
+                background-color: rgba(0,0,0,0.5);
+                z-index: 1040;
+            }
         }
         .copy-success {
             position: fixed;
@@ -593,8 +642,65 @@ $categories = getAllCategories();
         .share-menu {
             min-width: 200px;
             padding: 10px 0;
-            margin-top: 10px;
+            margin-top: 0;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 4px;
+            z-index: 1000;
+        }
+
+        .share-menu .dropdown-item {
+            padding: 8px 20px;
+            color: #333;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .share-menu .dropdown-item i {
+            width: 25px;
+            text-align: center;
+            color: #333;
+            transition: all 0.3s ease;
+        }
+
+        /* New responsive styles for share dropdown */
+        @media (max-width: 767px) {
+            .share-menu {
+                position: fixed !important;
+                top: 50% !important;
+                left: 50% !important;
+                bottom: auto !important;
+                right: auto !important;
+                transform: translate(-50%, -50%) !important;
+                width: 90% !important;
+                max-width: 300px !important;
+                margin: 0 !important;
+                background: white !important;
+                z-index: 1050 !important;
+                border-radius: 8px !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+            }
+            .share-menu .dropdown-item {
+                padding: 12px 20px !important;
+                font-size: 16px !important;
+            }
+            .share-menu .dropdown-item i {
+                width: 30px !important;
+                font-size: 18px !important;
+            }
+            .dropdown-backdrop {
+                position: fixed;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                left: 0;
+                background-color: rgba(0,0,0,0.5);
+                z-index: 1040;
+            }
         }
         /* Tag cloud colors */
         .tagcloud li a {
@@ -830,8 +936,13 @@ $categories = getAllCategories();
 
     <script>
         $(document).ready(function() {
-            // Initialize Bootstrap dropdowns
-            $('.dropdown-toggle').dropdown();
+            // Initialize Bootstrap dropdowns with specific options
+            $('.dropdown-toggle').dropdown({
+                display: 'static',
+                popperConfig: {
+                    placement: 'top-end'
+                }
+            });
 
             // Handle copy link
             $('.copy-link').click(function(e) {
@@ -854,6 +965,26 @@ $categories = getAllCategories();
             // Prevent dropdown from closing when clicking inside
             $('.share-menu').on('click', function(e) {
                 e.stopPropagation();
+            });
+
+            // Add backdrop for mobile devices
+            if ($(window).width() <= 767) {
+                $('.post-share .dropdown-toggle').on('shown.bs.dropdown', function () {
+                    $('<div class="dropdown-backdrop"></div>').insertAfter('.share-menu');
+                });
+
+                $('.post-share .dropdown-toggle').on('hidden.bs.dropdown', function () {
+                    $('.dropdown-backdrop').remove();
+                });
+            }
+
+            // Force dropdown position update on show
+            $('.post-share .dropdown-toggle').on('show.bs.dropdown', function () {
+                $(this).closest('.post-share').addClass('dropup');
+                $(this).next('.dropdown-menu').css({
+                    'display': 'block',
+                    'transform': 'translate3d(0px, 0px, 0px) !important'
+                });
             });
         });
 
