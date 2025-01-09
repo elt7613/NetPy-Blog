@@ -139,6 +139,14 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="assets/css/templatemo-stand-blog.css">
     <link rel="stylesheet" href="assets/css/owl.css">
+
+    <style>
+        @media (min-width: 992px) {
+            .blog-posts .col-lg-4 {
+                padding-left: 80px;
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -162,22 +170,22 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
             <div class="owl-banner owl-carousel">
                 <?php foreach ($featured_posts as $post): ?>
                 <div class="item">
-                    <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
-                    <div class="item-content">
-                        <div class="main-content">
-                            <div class="meta-category">
-                                <span><?php echo htmlspecialchars($post['category_name']); ?></span>
-                            </div>
-                            <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
+                    <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>" class="item-link">
+                        <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
+                        <div class="item-content">
+                            <div class="main-content">
+                                <div class="meta-category">
+                                    <span><?php echo htmlspecialchars($post['category_name']); ?></span>
+                                </div>
                                 <h4><?php echo htmlspecialchars($post['title']); ?></h4>
-                            </a>
-                            <ul class="post-info">
-                                <li><a href="#"><?php echo htmlspecialchars($post['author_name']); ?></a></li>
-                                <li><a href="#"><?php echo date('M d, Y', strtotime($post['created_at'])); ?></a></li>
-                                <li><a href="#"><?php echo $post['views']; ?> Views</a></li>
-                            </ul>
+                                <ul class="post-info">
+                                    <li><?php echo htmlspecialchars($post['author_name']); ?></li>
+                                    <li><?php echo date('M d, Y', strtotime($post['created_at'])); ?></li>
+                                    <li><?php echo $post['views']; ?> Views</li>
+                                </ul>
+                            </div>
                         </div>
-                    </div>
+                    </a>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -195,7 +203,9 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
                             <div class="col-lg-12">
                                 <div class="blog-post">
                                     <div class="blog-thumb">
-                                        <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
+                                        <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
+                                            <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
+                                        </a>
                                     </div>
                                     <div class="down-content">
                                         <span><?php echo htmlspecialchars($post['category_name']); ?></span>
@@ -215,7 +225,7 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
                                         </div>
                                         <div class="post-options">
                                             <div class="row">
-                                                <div class="col-lg-12">
+                                                <div class="col-6">
                                                     <ul class="post-tags">
                                                         <li><i class="fa fa-tags"></i></li>
                                                         <?php
@@ -243,6 +253,9 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
                                                         }
                                                         ?>
                                                     </ul>
+                                                </div>
+                                                <div class="col-6 text-right">
+                                                    <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>" class="read-more">Read More <i class="fa fa-arrow-right"></i></a>
                                                 </div>
                                             </div>
                                         </div>
@@ -324,7 +337,7 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
         $(document).ready(function() {
             var owl = $('.owl-banner');
             owl.owlCarousel({
-                items: 3,
+                items: 2,
                 loop: true,
                 dots: true,
                 nav: true,
@@ -333,9 +346,15 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
                     '&#x2192;'
                 ],
                 autoplay: true,
-                autoplayTimeout: 5000,
+                autoplayTimeout: 8000,
+                autoplaySpeed: 1000,
                 autoplayHoverPause: true,
-                margin: 30,
+                margin: 20,
+                slideBy: 1,
+                smartSpeed: 1000,
+                rewind: false,
+                lazyLoad: true,
+                stagePadding: 0,
                 responsive: {
                     0: {
                         items: 1,
@@ -346,15 +365,135 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
                         nav: true
                     },
                     1000: {
-                        items: 3,
+                        items: 2,
                         nav: true
                     }
                 }
             });
+
+            // Clone items for infinite loop
+            var $stage = owl.find('.owl-stage');
+            var stageItems = owl.find('.owl-item').clone(true);
+            $stage.append(stageItems);
+            owl.trigger('refresh.owl.carousel');
         });
     </script>
 
     <style>
+        .owl-banner {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .owl-banner .owl-stage-outer {
+            overflow: hidden;
+        }
+
+        .owl-banner .owl-stage {
+            display: flex;
+            transition: all 1000ms ease;
+        }
+
+        .owl-banner .owl-item {
+            flex-shrink: 0;
+            opacity: 1;
+            transition: opacity 0.4s ease;
+        }
+
+        .owl-banner .owl-item.cloned {
+            opacity: 1;
+        }
+
+        .owl-banner .item {
+            position: relative;
+            max-width: 500px;
+            margin: 0 auto;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .owl-banner .item:hover {
+            transform: translateY(-5px);
+        }
+
+        .owl-banner .item .item-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .owl-banner .item img {
+            max-height: 300px;
+            object-fit: cover;
+            width: 100%;
+            display: block;
+        }
+
+        .owl-banner .item-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            color: #fff;
+            text-align: center;
+        }
+
+        .owl-banner .item-content h4 {
+            color: #fff;
+            margin: 10px 0;
+            font-size: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .owl-banner .item-content .post-info {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .owl-banner .item-content .post-info li {
+            display: inline-block;
+            margin-right: 15px;
+            font-size: 14px;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .owl-banner .meta-category span {
+            background: #0047cc;
+            padding: 5px 15px;
+            border-radius: 25px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #fff;
+            display: inline-block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .owl-banner .item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%);
+            z-index: 1;
+        }
+
+        .owl-banner .item .item-link {
+            position: relative;
+            z-index: 2;
+        }
+
+        .owl-banner .item-content {
+            z-index: 2;
+        }
+
         .owl-banner .owl-nav {
             position: absolute;
             top: 50%;
@@ -560,6 +699,48 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
         .pagination .page-link:hover {
             background-color: #0047cc;
             color: #fff;
+        }
+
+        .read-more {
+            display: inline-flex;
+            align-items: center;
+            color: #181818;
+            font-weight: 500;
+            font-size: 13px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .read-more i {
+            margin-left: 5px;
+            transition: transform 0.3s ease;
+            font-size: 12px;
+        }
+
+        .read-more:hover {
+            color: #0047cc;
+            text-decoration: none;
+        }
+
+        .read-more:hover i {
+            transform: translateX(5px);
+        }
+
+        .blog-thumb {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .blog-thumb a {
+            display: block;
+        }
+
+        .blog-thumb img {
+            transition: transform 0.3s ease;
+        }
+
+        .blog-thumb:hover img {
+            transform: scale(1.05);
         }
     </style>
 </body>

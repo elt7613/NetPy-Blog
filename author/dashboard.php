@@ -74,31 +74,39 @@ if (!empty($status_filter)) {
 
 $count_stmt = $conn->prepare($count_sql);
 
-// Bind parameters for count query
-if (!empty($search) && !empty($status_filter) && !empty($date_from) && !empty($date_to)) {
-    $count_stmt->bind_param("issss", $_SESSION['user_id'], $search_param, $date_from, $date_to, $status_filter);
-} elseif (!empty($search) && !empty($date_from) && !empty($date_to)) {
-    $count_stmt->bind_param("isss", $_SESSION['user_id'], $search_param, $date_from, $date_to);
-} elseif (!empty($search) && !empty($status_filter)) {
-    $count_stmt->bind_param("iss", $_SESSION['user_id'], $search_param, $status_filter);
-} elseif (!empty($date_from) && !empty($date_to) && !empty($status_filter)) {
-    $count_stmt->bind_param("isss", $_SESSION['user_id'], $date_from, $date_to, $status_filter);
-} elseif (!empty($search)) {
-    $count_stmt->bind_param("is", $_SESSION['user_id'], $search_param);
-} elseif (!empty($date_from) && !empty($date_to)) {
-    $count_stmt->bind_param("iss", $_SESSION['user_id'], $date_from, $date_to);
-} elseif (!empty($status_filter)) {
-    $count_stmt->bind_param("is", $_SESSION['user_id'], $status_filter);
-} else {
-    $count_stmt->bind_param("i", $_SESSION['user_id']);
+// Build parameter array and types string for count query
+$count_params = array($_SESSION['user_id']);
+$count_types = "i";
+
+if ($active_filter !== '') {
+    $count_params[] = $active_filter;
+    $count_types .= "i";
 }
 
+if (!empty($search)) {
+    $count_params[] = $search_param;
+    $count_types .= "s";
+}
+
+if (!empty($date_from) && !empty($date_to)) {
+    $count_params[] = $date_from;
+    $count_params[] = $date_to;
+    $count_types .= "ss";
+}
+
+if (!empty($status_filter)) {
+    $count_params[] = $status_filter;
+    $count_types .= "s";
+}
+
+// Bind parameters dynamically for count query
+$count_stmt->bind_param($count_types, ...$count_params);
 $count_stmt->execute();
 $total_posts = $count_stmt->get_result()->fetch_assoc()['total'];
 $total_pages = ceil($total_posts / $posts_per_page);
 
 // Ensure current page is within valid range
-$page = max(1, min($page, $total_pages));
+$page = max(1, min($page, max(1, $total_pages)));
 
 // Modify the main query to include LIMIT and OFFSET
 $sql = "SELECT DISTINCT p.*, c.name as category_name,
@@ -106,10 +114,8 @@ $sql = "SELECT DISTINCT p.*, c.name as category_name,
         FROM posts p 
         LEFT JOIN categories c ON p.category_id = c.id 
         LEFT JOIN post_tags pt ON p.id = pt.post_id
-        LEFT JOIN tags t ON pt.tag_id = t.id AND t.deleted_at IS NULL AND t.is_active = 1
-        WHERE p.author_id = ? 
-        AND " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL") . "
-        AND (c.id IS NULL OR (c.deleted_at IS NULL AND c.is_active = 1))";
+        LEFT JOIN tags t ON pt.tag_id = t.id
+        WHERE p.author_id = ? AND " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL");
 
 // Add active/inactive filter
 if ($active_filter !== '') {
@@ -121,15 +127,12 @@ if (!empty($search)) {
     switch ($search_by) {
         case 'title':
             $sql .= " AND p.title LIKE ?";
-            $search_param = "%$search%";
             break;
         case 'category':
             $sql .= " AND c.name LIKE ?";
-            $search_param = "%$search%";
             break;
         case 'tag':
             $sql .= " AND t.name LIKE ?";
-            $search_param = "%$search%";
             break;
     }
 }
@@ -149,27 +152,47 @@ $sql .= " GROUP BY p.id ORDER BY p.created_at DESC LIMIT ? OFFSET ?";
 // Prepare and execute the query
 $stmt = $conn->prepare($sql);
 
-// Bind parameters based on filters
-if (!empty($search) && !empty($status_filter) && !empty($date_from) && !empty($date_to)) {
-    $stmt->bind_param("issssii", $_SESSION['user_id'], $search_param, $date_from, $date_to, $status_filter, $posts_per_page, $offset);
-} elseif (!empty($search) && !empty($date_from) && !empty($date_to)) {
-    $stmt->bind_param("isssii", $_SESSION['user_id'], $search_param, $date_from, $date_to, $posts_per_page, $offset);
-} elseif (!empty($search) && !empty($status_filter)) {
-    $stmt->bind_param("issii", $_SESSION['user_id'], $search_param, $status_filter, $posts_per_page, $offset);
-} elseif (!empty($date_from) && !empty($date_to) && !empty($status_filter)) {
-    $stmt->bind_param("isssii", $_SESSION['user_id'], $date_from, $date_to, $status_filter, $posts_per_page, $offset);
-} elseif (!empty($search)) {
-    $stmt->bind_param("isii", $_SESSION['user_id'], $search_param, $posts_per_page, $offset);
-} elseif (!empty($date_from) && !empty($date_to)) {
-    $stmt->bind_param("issii", $_SESSION['user_id'], $date_from, $date_to, $posts_per_page, $offset);
-} elseif (!empty($status_filter)) {
-    $stmt->bind_param("isii", $_SESSION['user_id'], $status_filter, $posts_per_page, $offset);
-} else {
-    $stmt->bind_param("iii", $_SESSION['user_id'], $posts_per_page, $offset);
+// Build parameter array and types string for main query
+$params = array($_SESSION['user_id']);
+$types = "i";
+
+if ($active_filter !== '') {
+    $params[] = $active_filter;
+    $types .= "i";
 }
 
+if (!empty($search)) {
+    $params[] = $search_param;
+    $types .= "s";
+}
+
+if (!empty($date_from) && !empty($date_to)) {
+    $params[] = $date_from;
+    $params[] = $date_to;
+    $types .= "ss";
+}
+
+if (!empty($status_filter)) {
+    $params[] = $status_filter;
+    $types .= "s";
+}
+
+// Add LIMIT and OFFSET parameters
+$params[] = $posts_per_page;
+$params[] = $offset;
+$types .= "ii";
+
+// Bind parameters dynamically for main query
+$stmt->bind_param($types, ...$params);
 $stmt->execute();
 $posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+// For debugging pagination issues
+if (empty($posts) && $page > 1) {
+    error_log("Debug - Page: $page, Total Pages: $total_pages, Offset: $offset, Total Posts: $total_posts");
+    error_log("Debug - SQL: $sql");
+    error_log("Debug - Params: " . print_r($params, true));
+}
 
 $page_title = "Author Dashboard";
 ?>
@@ -549,6 +572,8 @@ $page_title = "Author Dashboard";
                                                         echo !empty($search) ? '&search='.urlencode($search) : '';
                                                         echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                         echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                        echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                        echo !empty($show_deleted) ? '&show_deleted='.urlencode($show_deleted) : '';
                                                         echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                         echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                     ?>" aria-label="First">
@@ -560,6 +585,8 @@ $page_title = "Author Dashboard";
                                                         echo !empty($search) ? '&search='.urlencode($search) : '';
                                                         echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                         echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                        echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                        echo !empty($show_deleted) ? '&show_deleted='.urlencode($show_deleted) : '';
                                                         echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                         echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                     ?>" aria-label="Previous">
@@ -579,6 +606,8 @@ $page_title = "Author Dashboard";
                                                         echo !empty($search) ? '&search='.urlencode($search) : '';
                                                         echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                         echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                        echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                        echo !empty($show_deleted) ? '&show_deleted='.urlencode($show_deleted) : '';
                                                         echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                         echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                     ?>"><?php echo $i; ?></a>
@@ -591,6 +620,8 @@ $page_title = "Author Dashboard";
                                                         echo !empty($search) ? '&search='.urlencode($search) : '';
                                                         echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                         echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                        echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                        echo !empty($show_deleted) ? '&show_deleted='.urlencode($show_deleted) : '';
                                                         echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                         echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                     ?>" aria-label="Next">
@@ -602,6 +633,8 @@ $page_title = "Author Dashboard";
                                                         echo !empty($search) ? '&search='.urlencode($search) : '';
                                                         echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                         echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                        echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                        echo !empty($show_deleted) ? '&show_deleted='.urlencode($show_deleted) : '';
                                                         echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                         echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                     ?>" aria-label="Last">

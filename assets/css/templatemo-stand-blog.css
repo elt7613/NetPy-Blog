@@ -227,17 +227,17 @@ header .navbar {
 	box-shadow: 0px 1px 10px rgba(0,0,0,0.1);
 }
 .background-header .navbar-brand h2 {
-	color: #121212!important;
+	color: #181818!important;
 }
 .background-header .navbar-nav a.nav-link {
-	color: #1e1e1e!important;
+	color: #181818!important;
 }
 .background-header .navbar-nav .nav-link:hover,
 .background-header .navbar-nav .active>.nav-link,
 .background-header .navbar-nav .nav-link.active,
 .background-header .navbar-nav .nav-link.show,
 .background-header .navbar-nav .show>.nav-link {
-	color: #f48840!important;
+	color: #0047cc!important;
 }
 .navbar .navbar-brand {
 	float: 	left;
@@ -245,7 +245,7 @@ header .navbar {
 	outline: none;
 }
 .navbar .navbar-brand h2 {
-	color: #1e1e1e;
+	color: #181818;
 	text-transform: uppercase;
 	font-size: 24px;
 	font-weight: 900;
@@ -270,11 +270,11 @@ header .navbar {
 }
 .navbar .navbar-nav a.nav-link {
 	text-transform: capitalize;
-	font-size: 15px;
-	font-weight: 800;
+	font-size: 1rem;
+	font-weight: 400;
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
-	color: #1e1e1e;
+	color: #181818;
 	transition: all 0.3s;
 }
 .navbar .navbar-nav .nav-link:hover,

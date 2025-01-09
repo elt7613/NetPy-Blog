@@ -22,11 +22,7 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $posts_per_page = 10;
 $offset = ($page - 1) * $posts_per_page;
 
-// Initialize parameters array and types string
-$params = array();
-$types = '';
-
-// Base count query
+// Get total number of posts (for pagination)
 $count_sql = "SELECT COUNT(DISTINCT p.id) as total FROM posts p 
               LEFT JOIN categories c ON p.category_id = c.id 
               LEFT JOIN users u ON p.author_id = u.id 
@@ -34,65 +30,81 @@ $count_sql = "SELECT COUNT(DISTINCT p.id) as total FROM posts p
               LEFT JOIN tags t ON pt.tag_id = t.id
               WHERE " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL");
 
-// Add conditions and parameters
+// Add active/inactive filter
 if ($active_filter !== '') {
     $count_sql .= " AND p.is_active = ?";
-    $types .= "i";
-    $params[] = $active_filter;
 }
 
+// Add search conditions to count query
 if (!empty($search)) {
     switch ($search_by) {
         case 'title':
             $count_sql .= " AND p.title LIKE ?";
+            $search_param = "%$search%";
             break;
         case 'author':
             $count_sql .= " AND u.username LIKE ?";
+            $search_param = "%$search%";
             break;
         case 'category':
             $count_sql .= " AND c.name LIKE ?";
+            $search_param = "%$search%";
             break;
         case 'tag':
             $count_sql .= " AND t.name LIKE ?";
+            $search_param = "%$search%";
             break;
     }
-    $types .= "s";
-    $params[] = "%$search%";
 }
 
 if (!empty($date_from) && !empty($date_to)) {
     $count_sql .= " AND DATE(p.created_at) BETWEEN ? AND ?";
-    $types .= "ss";
-    $params[] = $date_from;
-    $params[] = $date_to;
 }
 
 if (!empty($status_filter)) {
     $count_sql .= " AND p.status = ?";
-    $types .= "s";
-    $params[] = $status_filter;
 }
 
-// Prepare and execute count query
 $count_stmt = $conn->prepare($count_sql);
-if (!empty($params)) {
-    $count_stmt->bind_param($types, ...$params);
+
+// Build parameter array and types string for count query
+$count_params = array();
+$count_types = "";
+
+if ($active_filter !== '') {
+    $count_params[] = $active_filter;
+    $count_types .= "i";
+}
+
+if (!empty($search)) {
+    $count_params[] = $search_param;
+    $count_types .= "s";
+}
+
+if (!empty($date_from) && !empty($date_to)) {
+    $count_params[] = $date_from;
+    $count_params[] = $date_to;
+    $count_types .= "ss";
+}
+
+if (!empty($status_filter)) {
+    $count_params[] = $status_filter;
+    $count_types .= "s";
+}
+
+// Bind parameters dynamically for count query
+if (!empty($count_params)) {
+    $count_stmt->bind_param($count_types, ...$count_params);
 }
 $count_stmt->execute();
-$result = $count_stmt->get_result();
-$total_posts = $result->fetch_assoc()['total'];
+$total_posts = $count_stmt->get_result()->fetch_assoc()['total'];
 $total_pages = ceil($total_posts / $posts_per_page);
-$count_stmt->close();
 
 // Ensure current page is within valid range
-$page = max(1, min($page, $total_pages));
+$page = max(1, min($page, max(1, $total_pages)));
 
-// Reset parameters for main query
-$params = array();
-$types = '';
-
-// Base main query
-$sql = "SELECT p.*, c.name as category_name, u.username as author_name,
+// Modify the main query to include LIMIT and OFFSET
+$sql = "SELECT DISTINCT p.*, c.name as category_name, u.username as author_name,
         GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
         FROM posts p 
         LEFT JOIN categories c ON p.category_id = c.id 
@@ -101,13 +113,12 @@ $sql = "SELECT p.*, c.name as category_name, u.username as author_name,
         LEFT JOIN tags t ON pt.tag_id = t.id
         WHERE " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL");
 
-// Add conditions and parameters
+// Add active/inactive filter
 if ($active_filter !== '') {
     $sql .= " AND p.is_active = ?";
-    $types .= "i";
-    $params[] = $active_filter;
 }
 
+// Add search conditions
 if (!empty($search)) {
     switch ($search_by) {
         case 'title':
@@ -123,36 +134,66 @@ if (!empty($search)) {
             $sql .= " AND t.name LIKE ?";
             break;
     }
-    $types .= "s";
-    $params[] = "%$search%";
 }
 
+// Add date range filter
 if (!empty($date_from) && !empty($date_to)) {
     $sql .= " AND DATE(p.created_at) BETWEEN ? AND ?";
-    $types .= "ss";
-    $params[] = $date_from;
-    $params[] = $date_to;
 }
 
+// Add status filter
 if (!empty($status_filter)) {
     $sql .= " AND p.status = ?";
-    $types .= "s";
-    $params[] = $status_filter;
 }
 
 $sql .= " GROUP BY p.id ORDER BY p.created_at DESC LIMIT ? OFFSET ?";
-$types .= "ii";
+
+// Prepare and execute the query
+$stmt = $conn->prepare($sql);
+
+// Build parameter array and types string for main query
+$params = array();
+$types = "";
+
+if ($active_filter !== '') {
+    $params[] = $active_filter;
+    $types .= "i";
+}
+
+if (!empty($search)) {
+    $params[] = $search_param;
+    $types .= "s";
+}
+
+if (!empty($date_from) && !empty($date_to)) {
+    $params[] = $date_from;
+    $params[] = $date_to;
+    $types .= "ss";
+}
+
+if (!empty($status_filter)) {
+    $params[] = $status_filter;
+    $types .= "s";
+}
+
+// Add LIMIT and OFFSET parameters
 $params[] = $posts_per_page;
 $params[] = $offset;
+$types .= "ii";
 
-// Prepare and execute main query
-$stmt = $conn->prepare($sql);
+// Bind parameters dynamically for main query
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
 }
 $stmt->execute();
 $posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+
+// For debugging pagination issues
+if (empty($posts) && $page > 1) {
+    error_log("Debug - Page: $page, Total Pages: $total_pages, Offset: $offset, Total Posts: $total_posts");
+    error_log("Debug - SQL: $sql");
+    error_log("Debug - Params: " . print_r($params, true));
+}
 
 // Get post statistics
 $stats_stmt = $conn->prepare("SELECT 
@@ -433,12 +474,12 @@ include '../includes/header.php';
                                     </div>
                                     <!-- Search Form -->
                                     <div class="mb-4">
-                                        <form method="GET" class="form-inline">
-                                            <div class="row w-100">
-                                                <div class="col-md-2">
+                                        <form method="GET" class="form">
+                                            <div class="row">
+                                                <div class="col-md-3 mb-2">
                                                     <input type="text" name="search" class="form-control" placeholder="Search..." value="<?php echo htmlspecialchars($search); ?>">
                                                 </div>
-                                                <div class="col-md-2">
+                                                <div class="col-md-2 mb-2">
                                                     <select name="search_by" class="form-control">
                                                         <option value="title" <?php echo $search_by === 'title' ? 'selected' : ''; ?>>Title</option>
                                                         <option value="author" <?php echo $search_by === 'author' ? 'selected' : ''; ?>>Author</option>
@@ -446,36 +487,38 @@ include '../includes/header.php';
                                                         <option value="tag" <?php echo $search_by === 'tag' ? 'selected' : ''; ?>>Tag</option>
                                                     </select>
                                                 </div>
-                                                <div class="col-md-2">
+                                                <div class="col-md-2 mb-2">
                                                     <select name="status" class="form-control">
                                                         <option value="">All Status</option>
                                                         <option value="published" <?php echo $status_filter === 'published' ? 'selected' : ''; ?>>Published</option>
                                                         <option value="draft" <?php echo $status_filter === 'draft' ? 'selected' : ''; ?>>Draft</option>
                                                     </select>
                                                 </div>
-                                                <div class="col-md-2">
+                                                <div class="col-md-2 mb-2">
                                                     <select name="active" class="form-control">
                                                         <option value="">All Posts</option>
                                                         <option value="1" <?php echo $active_filter === '1' ? 'selected' : ''; ?>>Active</option>
                                                         <option value="0" <?php echo $active_filter === '0' ? 'selected' : ''; ?>>Inactive</option>
                                                     </select>
                                                 </div>
-                                                <div class="col-md-2">
+                                                <div class="col-md-3 mb-2">
                                                     <select name="show_deleted" class="form-control">
                                                         <option value="0" <?php echo $show_deleted === '0' ? 'selected' : ''; ?>>Active Posts</option>
                                                         <option value="1" <?php echo $show_deleted === '1' ? 'selected' : ''; ?>>Deleted Posts</option>
                                                     </select>
                                                 </div>
-                                                <div class="col-md-2">
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-md-3 mb-2">
                                                     <input type="date" name="date_from" class="form-control" placeholder="From Date" value="<?php echo htmlspecialchars($date_from); ?>">
                                                 </div>
-                                                <div class="col-md-2">
+                                                <div class="col-md-3 mb-2">
                                                     <input type="date" name="date_to" class="form-control" placeholder="To Date" value="<?php echo htmlspecialchars($date_to); ?>">
                                                 </div>
-                                                <div class="col-md-1">
+                                                <div class="col-md-6 mb-2">
                                                     <button type="submit" class="btn btn-primary">Search</button>
-                                                    <?php if (!empty($search) || !empty($status_filter) || !empty($date_from) || !empty($date_to)): ?>
-                                                        <a href="dashboard.php" class="btn btn-secondary mt-2">Clear</a>
+                                                    <?php if (!empty($search) || !empty($status_filter) || !empty($date_from) || !empty($date_to) || !empty($active_filter) || $show_deleted === '1'): ?>
+                                                        <a href="dashboard.php" class="btn btn-secondary">Clear</a>
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
@@ -496,7 +539,7 @@ include '../includes/header.php';
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <?php foreach ($recent_posts as $post): ?>
+                                                <?php foreach ($posts as $post): ?>
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($post['title']); ?></td>
                                                     <td>
@@ -562,6 +605,8 @@ include '../includes/header.php';
                                                                 echo !empty($search) ? '&search='.urlencode($search) : '';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                                echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                             ?>" aria-label="First">
@@ -573,6 +618,8 @@ include '../includes/header.php';
                                                                 echo !empty($search) ? '&search='.urlencode($search) : '';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                                echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                             ?>" aria-label="Previous">
@@ -592,6 +639,8 @@ include '../includes/header.php';
                                                                 echo !empty($search) ? '&search='.urlencode($search) : '';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                                echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                             ?>"><?php echo $i; ?></a>
@@ -604,6 +653,8 @@ include '../includes/header.php';
                                                                 echo !empty($search) ? '&search='.urlencode($search) : '';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                                echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                             ?>" aria-label="Next">
@@ -615,6 +666,8 @@ include '../includes/header.php';
                                                                 echo !empty($search) ? '&search='.urlencode($search) : '';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
+                                                                echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
+                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
                                                             ?>" aria-label="Last">

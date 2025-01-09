@@ -20,6 +20,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param("ss", $name, $slug);
             $stmt->execute();
         } 
+        elseif ($_POST['action'] === 'edit' && !empty($_POST['tag_id']) && !empty($_POST['name'])) {
+            $tag_id = (int)$_POST['tag_id'];
+            $name = html_entity_decode(sanitizeInput($_POST['name']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $slug = createSlug($name);
+            
+            $sql = "UPDATE tags SET name = ?, slug = ? WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ssi", $name, $slug, $tag_id);
+            $stmt->execute();
+        }
         elseif ($_POST['action'] === 'delete' && !empty($_POST['tag_id'])) {
             $tag_id = (int)$_POST['tag_id'];
             
@@ -223,6 +233,9 @@ $stmt->close();
                                                 <td><?php echo htmlspecialchars($tag['slug']); ?></td>
                                                 <td>
                                                     <?php if ($show_deleted === '0'): ?>
+                                                        <button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#editTagModal<?php echo $tag['id']; ?>">
+                                                            <i class="fa fa-edit"></i> Edit
+                                                        </button>
                                                         <form action="manage-tags.php" method="post" style="display: inline;">
                                                             <input type="hidden" name="action" value="toggle_status">
                                                             <input type="hidden" name="tag_id" value="<?php echo $tag['id']; ?>">
@@ -238,6 +251,34 @@ $stmt->close();
                                                                 <i class="fa fa-trash"></i> Delete
                                                             </button>
                                                         </form>
+
+                                                        <!-- Edit Tag Modal -->
+                                                        <div class="modal fade" id="editTagModal<?php echo $tag['id']; ?>" tabindex="-1" role="dialog" aria-labelledby="editTagModalLabel<?php echo $tag['id']; ?>" aria-hidden="true">
+                                                            <div class="modal-dialog" role="document">
+                                                                <div class="modal-content">
+                                                                    <div class="modal-header">
+                                                                        <h5 class="modal-title" id="editTagModalLabel<?php echo $tag['id']; ?>">Edit Tag</h5>
+                                                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                                            <span aria-hidden="true">&times;</span>
+                                                                        </button>
+                                                                    </div>
+                                                                    <form action="manage-tags.php" method="post">
+                                                                        <div class="modal-body">
+                                                                            <input type="hidden" name="action" value="edit">
+                                                                            <input type="hidden" name="tag_id" value="<?php echo $tag['id']; ?>">
+                                                                            <div class="form-group">
+                                                                                <label for="tagName<?php echo $tag['id']; ?>">Tag Name</label>
+                                                                                <input type="text" class="form-control" id="tagName<?php echo $tag['id']; ?>" name="name" value="<?php echo htmlspecialchars($tag['name']); ?>" required>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="modal-footer">
+                                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                                                                        </div>
+                                                                    </form>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     <?php else: ?>
                                                         <span class="badge badge-danger">Deleted</span>
                                                     <?php endif; ?>

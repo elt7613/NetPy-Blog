@@ -139,6 +139,14 @@ $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) :
                         .sidebar-item .tags ul.tags li a.tag-4 { font-size: 15px; }
                         .sidebar-item .tags ul.tags li a.tag-5 { font-size: 16px; }
                         
+                        /* Style for recent post titles */
+                        .sidebar-item.recent-posts li a h5 {
+                            font-size: 1.1rem;
+                            font-weight: 500;
+                            margin: 0;
+                            color: #181818;
+                        }
+                        
                         /* Normalize scrollbar appearance */
                         .sidebar::-webkit-scrollbar {
                             width: 5px;

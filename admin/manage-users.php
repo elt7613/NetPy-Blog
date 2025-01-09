@@ -24,6 +24,33 @@ if (isset($_POST['delete_user'])) {
     exit();
 }
 
+// Handle role change
+if (isset($_POST['change_role']) && isset($_POST['user_id']) && isset($_POST['new_role'])) {
+    $user_id = (int)$_POST['user_id'];
+    $new_role = $_POST['new_role'];
+    
+    // Validate role
+    $valid_roles = ['user', 'author', 'admin'];
+    if (in_array($new_role, $valid_roles)) {
+        // Prevent changing own role
+        if ($user_id != $_SESSION['user_id']) {
+            $stmt = $conn->prepare("UPDATE users SET role = ? WHERE id = ?");
+            $stmt->bind_param("si", $new_role, $user_id);
+            if ($stmt->execute()) {
+                $_SESSION['success_msg'] = "User role updated successfully!";
+            } else {
+                $_SESSION['error_msg'] = "Failed to update user role.";
+            }
+        } else {
+            $_SESSION['error_msg'] = "You cannot change your own role!";
+        }
+    } else {
+        $_SESSION['error_msg'] = "Invalid role selected.";
+    }
+    header('Location: manage-users.php');
+    exit();
+}
+
 // Handle user activation/deactivation
 if (isset($_POST['toggle_status'])) {
     $user_id = $_POST['user_id'];
@@ -289,15 +316,15 @@ include '../includes/header.php';
                                                 <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                                     <form method="POST" class="d-inline">
                                                         <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
-                                                        <select name="new_role" onchange="this.form.submit()" class="form-control form-control-sm d-inline w-auto">
-                                                            <option value="user" <?php echo $user['role'] == 'user' ? 'selected' : ''; ?>>User</option>
-                                                            <option value="author" <?php echo $user['role'] == 'author' ? 'selected' : ''; ?>>Author</option>
-                                                            <option value="admin" <?php echo $user['role'] == 'admin' ? 'selected' : ''; ?>>Admin</option>
-                                                        </select>
                                                         <input type="hidden" name="change_role" value="1">
+                                                        <select name="new_role" class="form-control form-control-sm d-inline w-auto" onchange="this.form.submit()">
+                                                            <option value="user" <?php echo $user['role'] === 'user' ? 'selected' : ''; ?>>User</option>
+                                                            <option value="author" <?php echo $user['role'] === 'author' ? 'selected' : ''; ?>>Author</option>
+                                                            <option value="admin" <?php echo $user['role'] === 'admin' ? 'selected' : ''; ?>>Admin</option>
+                                                        </select>
                                                     </form>
                                                 <?php else: ?>
-                                                    <?php echo ucfirst($user['role']); ?>
+                                                    <span class="badge badge-info"><?php echo ucfirst($user['role']); ?></span>
                                                 <?php endif; ?>
                                             </td>
                                             <td><?php echo date('M d, Y', strtotime($user['created_at'])); ?></td>

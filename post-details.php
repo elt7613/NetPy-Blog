@@ -16,6 +16,46 @@ if (!$post) {
     exit;
 }
 
+// Get previous post
+$prev_sql = "SELECT p.*, c.name as category_name 
+             FROM posts p 
+             LEFT JOIN categories c ON p.category_id = c.id
+             WHERE p.status = 'published' 
+             AND p.deleted_at IS NULL 
+             AND p.is_active = 1
+             AND c.deleted_at IS NULL 
+             AND c.is_active = 1
+             AND (
+                 p.created_at < ? 
+                 OR (p.created_at = ? AND p.id < ?)
+             )
+             ORDER BY p.created_at DESC, p.id DESC
+             LIMIT 1";
+$stmt = $conn->prepare($prev_sql);
+$stmt->bind_param("ssi", $post['created_at'], $post['created_at'], $post['id']);
+$stmt->execute();
+$prev_post = $stmt->get_result()->fetch_assoc();
+
+// Get next post
+$next_sql = "SELECT p.*, c.name as category_name 
+             FROM posts p 
+             LEFT JOIN categories c ON p.category_id = c.id
+             WHERE p.status = 'published' 
+             AND p.deleted_at IS NULL 
+             AND p.is_active = 1
+             AND c.deleted_at IS NULL 
+             AND c.is_active = 1
+             AND (
+                 p.created_at > ? 
+                 OR (p.created_at = ? AND p.id > ?)
+             )
+             ORDER BY p.created_at ASC, p.id ASC
+             LIMIT 1";
+$stmt = $conn->prepare($next_sql);
+$stmt->bind_param("ssi", $post['created_at'], $post['created_at'], $post['id']);
+$stmt->execute();
+$next_post = $stmt->get_result()->fetch_assoc();
+
 // Check if current user is the author of the post
 $isAuthor = isLoggedIn() && $_SESSION['user_id'] == $post['author_id'];
 
@@ -248,6 +288,12 @@ $categories = getAllCategories();
     <link rel="stylesheet" href="assets/css/owl.css">
     <link rel="stylesheet" href="assets/css/accordions.js">
     <style>
+        @media (min-width: 992px) {
+            .blog-posts .col-lg-4 {
+                padding-left: 80px;
+            }
+        }
+        
         .post-share {
             position: relative;
         }
@@ -721,6 +767,84 @@ $categories = getAllCategories();
         .tagcloud li span {
             color: #353935;
         }
+
+        .post-navigation {
+            padding: 30px 0;
+            margin: 30px 0;
+            border-top: 1px solid #dddddd;
+            border-bottom: 1px solid #dddddd;
+        }
+
+        .post-navigation .prev-post,
+        .post-navigation .next-post {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .post-navigation span {
+            font-size: 14px;
+            color: #181818;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .post-navigation a {
+            color: #181818;
+            font-weight: 500;
+            font-size: 16px;
+            text-decoration: none;
+            transition: color 0.3s ease;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .post-navigation span:hover {
+            color: #0047cc;
+        }
+
+        .post-navigation .next-post {
+            align-items: flex-end;
+            text-align: right;
+        }
+
+        .post-navigation .prev-post span i {
+            margin-right: 5px;
+        }
+
+        .post-navigation .next-post span i {
+            margin-left: 5px;
+        }
+
+        .share-menu .p-3 {
+            padding: 1rem !important;
+        }
+        .share-menu .text-center {
+            text-align: center !important;
+        }
+        .share-menu p {
+            margin-bottom: 0.5rem !important;
+            color: #333;
+            font-size: 14px;
+        }
+        .share-menu .btn-primary {
+            background-color: #f48840;
+            border-color: #f48840;
+            color: #fff;
+            padding: 0.375rem 1.5rem;
+            font-size: 14px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        .share-menu .btn-primary:hover {
+            background-color: #e67730;
+            border-color: #e67730;
+        }
+
     </style>
 </head>
 
@@ -828,28 +952,63 @@ $categories = getAllCategories();
                                                                 $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
                                                                 $title = urlencode($post['title']);
                                                                 $url = urlencode($current_url);
+                                                                $return_url = urlencode($_SERVER['REQUEST_URI']);
+                                                                
+                                                                if (isLoggedIn()):
                                                                 ?>
-                                                                <a class="dropdown-item" href="https://www.facebook.com/sharer/sharer.php?u=<?php echo $url; ?>" target="_blank">
+                                                                <a class="dropdown-item share-link" href="https://www.facebook.com/sharer/sharer.php?u=<?php echo $url; ?>" target="_blank">
                                                                     <i class="fa fa-facebook"></i> Facebook
                                                                 </a>
-                                                                <a class="dropdown-item" href="https://twitter.com/intent/tweet?url=<?php echo $url; ?>&text=<?php echo $title; ?>" target="_blank">
+                                                                <a class="dropdown-item share-link" href="https://twitter.com/intent/tweet?url=<?php echo $url; ?>&text=<?php echo $title; ?>" target="_blank">
                                                                     <i class="fa fa-twitter"></i> Twitter
                                                                 </a>
-                                                                <a class="dropdown-item" href="https://www.linkedin.com/shareArticle?mini=true&url=<?php echo $url; ?>&title=<?php echo $title; ?>" target="_blank">
+                                                                <a class="dropdown-item share-link" href="https://www.linkedin.com/shareArticle?mini=true&url=<?php echo $url; ?>&title=<?php echo $title; ?>" target="_blank">
                                                                     <i class="fa fa-linkedin"></i> LinkedIn
                                                                 </a>
-                                                                <a class="dropdown-item" href="https://api.whatsapp.com/send?text=<?php echo $title . ' ' . $url; ?>" target="_blank">
+                                                                <a class="dropdown-item share-link" href="https://api.whatsapp.com/send?text=<?php echo $title . ' ' . $url; ?>" target="_blank">
                                                                     <i class="fa fa-whatsapp"></i> WhatsApp
                                                                 </a>
                                                                 <div class="dropdown-divider"></div>
                                                                 <a class="dropdown-item copy-link" href="#" data-url="<?php echo htmlspecialchars($current_url); ?>">
                                                                     <i class="fa fa-link"></i> Copy Link
                                                                 </a>
+                                                                <?php else: ?>
+                                                                <div class="p-3 text-center">
+                                                                    <p class="mb-2">Please login to share this post</p>
+                                                                    <a href="login.php?return_url=<?php echo $return_url; ?>" class="btn btn-primary btn-sm">Login</a>
+                                                                </div>
+                                                                <?php endif; ?>
                                                             </div>
                                                         </li>
                                                     </ul>
                                                 </div>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Post Navigation -->
+                            <div class="col-lg-12">
+                                <div class="post-navigation">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <?php if ($prev_post): ?>
+                                            <div class="prev-post">
+                                                <a href="post-details.php?slug=<?php echo urlencode($prev_post['slug']); ?>">
+                                                    <span><i class="fa fa-arrow-left"></i> Previous Post</span>
+                                                </a>
+                                            </div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-6 text-right">
+                                            <?php if ($next_post): ?>
+                                            <div class="next-post">
+                                                <a href="post-details.php?slug=<?php echo urlencode($next_post['slug']); ?>">
+                                                    <span>Next Post <i class="fa fa-arrow-right"></i></span>
+                                                </a>
+                                            </div>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -944,8 +1103,20 @@ $categories = getAllCategories();
                 }
             });
 
+            <?php if (!isLoggedIn()): ?>
+            // For non-logged in users, redirect share attempts to login
+            $('.share-link').on('click', function(e) {
+                e.preventDefault();
+                window.location.href = 'login.php?return_url=<?php echo $return_url; ?>';
+            });
+            <?php endif; ?>
+
             // Handle copy link
             $('.copy-link').click(function(e) {
+                <?php if (!isLoggedIn()): ?>
+                e.preventDefault();
+                window.location.href = 'login.php?return_url=<?php echo $return_url; ?>';
+                <?php else: ?>
                 e.preventDefault();
                 var url = $(this).data('url');
                 
@@ -960,6 +1131,7 @@ $categories = getAllCategories();
                 
                 // Show success message
                 $('.copy-success').fadeIn().delay(2000).fadeOut();
+                <?php endif; ?>
             });
 
             // Prevent dropdown from closing when clicking inside

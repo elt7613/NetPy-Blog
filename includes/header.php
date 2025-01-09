@@ -4,6 +4,21 @@ $current_path = $_SERVER['PHP_SELF'];
 $is_admin_page = strpos($current_path, '/admin/') !== false;
 $is_author_page = strpos($current_path, '/author/') !== false;
 $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
+
+// Get categories with post count for the navbar
+$nav_categories_sql = "SELECT c.*, COUNT(p.id) as post_count 
+                      FROM categories c 
+                      LEFT JOIN posts p ON c.id = p.category_id 
+                      AND p.status = 'published' 
+                      AND p.deleted_at IS NULL 
+                      AND p.is_active = 1
+                      WHERE c.deleted_at IS NULL 
+                      AND c.is_active = 1
+                      GROUP BY c.id 
+                      HAVING post_count > 0
+                      ORDER BY c.name";
+$nav_categories_result = $conn->query($nav_categories_sql);
+$nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYSQLI_ASSOC) : [];
 ?>
 
 <!DOCTYPE html>
@@ -54,6 +69,68 @@ $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
         .navbar-toggler-icon {
             background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 30 30' xmlns='http://www.w3.org/2000/svg'%3e%3cpath stroke='rgba(0, 0, 0, 0.5)' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
         }
+
+        .categories-dropdown {
+            position: relative;
+        }
+
+        .categories-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 15px;
+            min-width: 220px;
+            z-index: 1000;
+        }
+
+        /* Show categories menu on hover only for desktop */
+        @media (min-width: 992px) {
+            .categories-dropdown:hover .categories-menu {
+                display: block;
+            }
+        }
+
+        .categories-menu ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .categories-menu ul li {
+            padding: 8px 15px;
+            position: relative;
+            padding-left: 20px;
+            text-align: left;
+        }
+
+        .categories-menu ul li:before {
+            content: "•";
+            position: absolute;
+            top: 12px;
+            left: 5px;
+            color: #181818;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .categories-menu ul li:hover {
+            background: #eee;
+            border-radius: 4px;
+        }
+
+        .categories-menu ul li a {
+            color: #181818;
+            text-decoration: none;
+            display: block;
+        }
+
+        .categories-menu ul li a:hover {
+            color: #0047cc;
+        }
     </style>
 </head>
 
@@ -80,6 +157,21 @@ $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="<?php echo $base_url; ?>index.php">Blogs</a>
+                        </li>
+                        <li class="nav-item categories-dropdown">
+                            <a class="nav-link" href="#">Categories</a>
+                            <div class="categories-menu">
+                                <ul>
+                                    <?php foreach ($nav_categories as $category): ?>
+                                    <li>
+                                        <a href="<?php echo $base_url; ?>category.php?slug=<?php echo urlencode($category['slug']); ?>">
+                                            <?php echo htmlspecialchars($category['name']); ?>
+                                            <small>(<?php echo $category['post_count']; ?>)</small>
+                                        </a>
+                                    </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
                         </li>
                         <?php if (isLoggedIn()): ?>
                             <?php if (isAdmin()): ?>
@@ -159,13 +251,38 @@ $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
                 }
             });
 
-            // Close menu when clicking on a nav link (for mobile)
-            $('.nav-link').on('click', function() {
+            // Close menu when clicking on a nav link (for mobile), except for categories
+            $('.nav-link').not('.categories-dropdown > .nav-link').on('click', function() {
                 var $navbar = $('.navbar-collapse');
                 if ($navbar.hasClass('show')) {
                     $navbar.collapse('hide');
                 }
             });
+
+            // Handle categories dropdown on mobile
+            if (window.matchMedia("(max-width: 991px)").matches) {
+                // Remove any existing click handlers first
+                $('.categories-dropdown > a').off('click');
+                
+                $('.categories-dropdown > a').on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation(); // Prevent event from bubbling up
+                    var $menu = $(this).siblings('.categories-menu');
+                    $('.categories-menu').not($menu).slideUp(); // Close other menus
+                    $menu.slideToggle();
+                });
+
+                // Prevent categories menu clicks from closing the main menu
+                $('.categories-menu').on('click', function(e) {
+                    e.stopPropagation();
+                });
+
+                // Handle clicks on category items
+                $('.categories-menu a').on('click', function(e) {
+                    var $navbar = $('.navbar-collapse');
+                    $navbar.collapse('hide');
+                });
+            }
         });
     </script>
 </body>
