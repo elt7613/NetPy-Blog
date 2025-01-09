@@ -113,6 +113,62 @@ $categories = getAllCategories();
                 padding-left: 80px;
             }
         }
+
+        .blog-post {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s ease;
+            margin-bottom: 30px;
+            border-radius: 20px;
+            overflow: hidden;
+            background-color: #fff;
+        }
+        
+        .blog-post:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+
+        .blog-post .blog-thumb {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .blog-post .blog-thumb a {
+            display: block;
+        }
+
+        .blog-post .blog-thumb img {
+            transition: transform 0.3s ease;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .blog-post .blog-thumb:hover img {
+            transform: scale(1.05);
+        }
+
+        .read-more {
+            display: inline-flex;
+            align-items: center;
+            color: #181818;
+            font-weight: 500;
+            font-size: 13px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .read-more i {
+            margin-left: 5px;
+            transition: transform 0.3s ease;
+            font-size: 12px;
+        }
+
+        .read-more:hover {
+            color: #0047cc;
+            text-decoration: none;
+        }
+
+        .read-more:hover i {
+            transform: translateX(5px);
+        }
     </style>
 </head>
 
@@ -149,9 +205,13 @@ $categories = getAllCategories();
                                         <div class="blog-post">
                                             <div class="blog-thumb">
                                                 <?php if (!empty($post['image_path'])): ?>
-                                                    <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>" class="img-fluid">
+                                                    <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
+                                                        <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>" class="img-fluid">
+                                                    </a>
                                                 <?php else: ?>
-                                                    <img src="assets/images/default-post.jpg" alt="Default post image" class="img-fluid">
+                                                    <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
+                                                        <img src="assets/images/default-post.jpg" alt="Default post image" class="img-fluid">
+                                                    </a>
                                                 <?php endif; ?>
                                             </div>
                                             <div class="down-content">
@@ -172,30 +232,28 @@ $categories = getAllCategories();
                                                 </div>
                                                 <div class="post-options">
                                                     <div class="row">
-                                                        <div class="col-lg-12">
+                                                        <div class="col-6">
                                                             <ul class="post-tags">
                                                                 <li><i class="fa fa-tags"></i></li>
                                                                 <?php
-                                                                // Get post tags
-                                                                $sql = "SELECT t.name, t.slug 
-                                                                        FROM tags t 
-                                                                        JOIN post_tags pt ON t.id = pt.tag_id 
-                                                                        WHERE pt.post_id = ?
-                                                                        AND t.deleted_at IS NULL 
-                                                                        AND t.is_active = 1";
-                                                                $stmt = $conn->prepare($sql);
-                                                                $stmt->bind_param("i", $post['id']);
-                                                                $stmt->execute();
-                                                                $post_tags = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-                                                                
-                                                                foreach ($post_tags as $index => $post_tag) {
-                                                                    echo '<li><a href="tag.php?slug=' . urlencode($post_tag['slug']) . '">' . 
-                                                                         htmlspecialchars($post_tag['name']) . '</a>';
-                                                                    if ($index < count($post_tags) - 1) echo ', ';
-                                                                    echo '</li>';
+                                                                if (!empty($post['post_tags'])) {
+                                                                    $tags = explode(', ', $post['post_tags']);
+                                                                    foreach ($tags as $index => $tag) {
+                                                                        echo '<li><a href="tag.php?slug=' . urlencode(createSlug($tag)) . '">' . 
+                                                                             htmlspecialchars($tag) . '</a>';
+                                                                        if ($index < count($tags) - 1) {
+                                                                            echo ', ';
+                                                                        }
+                                                                        echo '</li>';
+                                                                    }
+                                                                } else {
+                                                                    echo '<li>No tags</li>';
                                                                 }
                                                                 ?>
                                                             </ul>
+                                                        </div>
+                                                        <div class="col-6 text-right">
+                                                            <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>" class="read-more">Read More <i class="fa fa-arrow-right"></i></a>
                                                         </div>
                                                     </div>
                                                 </div>

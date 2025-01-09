@@ -118,6 +118,62 @@ $categories = getAllCategories();
                 padding-left: 80px;
             }
         }
+
+        .blog-post {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s ease;
+            margin-bottom: 30px;
+            border-radius: 20px;
+            overflow: hidden;
+            background-color: #fff;
+        }
+        
+        .blog-post:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+
+        .blog-post .blog-thumb {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .blog-post .blog-thumb a {
+            display: block;
+        }
+
+        .blog-post .blog-thumb img {
+            transition: transform 0.3s ease;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .blog-post .blog-thumb:hover img {
+            transform: scale(1.05);
+        }
+
+        .read-more {
+            display: inline-flex;
+            align-items: center;
+            color: #181818;
+            font-weight: 500;
+            font-size: 13px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .read-more i {
+            margin-left: 5px;
+            transition: transform 0.3s ease;
+            font-size: 12px;
+        }
+
+        .read-more:hover {
+            color: #0047cc;
+            text-decoration: none;
+        }
+
+        .read-more:hover i {
+            transform: translateX(5px);
+        }
     </style>
 </head>
 
@@ -179,7 +235,9 @@ $categories = getAllCategories();
                                 <div class="col-lg-12">
                                     <div class="blog-post">
                                         <div class="blog-thumb">
-                                            <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
+                                            <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
+                                                <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
+                                            </a>
                                         </div>
                                         <div class="down-content">
                                             <span><?php echo htmlspecialchars($post['category_name']); ?></span>
@@ -191,10 +249,15 @@ $categories = getAllCategories();
                                                 <li><a href="#"><?php echo date('M d, Y', strtotime($post['created_at'])); ?></a></li>
                                                 <li><a href="#"><?php echo $post['views']; ?> Views</a></li>
                                             </ul>
-                                            <p><?php echo substr(strip_tags($post['content']), 0, 200) . '...'; ?></p>
+                                            <div class="post-preview">
+                                                <?php 
+                                                $preview = strip_tags($post['content']);
+                                                echo strlen($preview) > 200 ? substr($preview, 0, 200) . '...' : $preview;
+                                                ?>
+                                            </div>
                                             <div class="post-options">
                                                 <div class="row">
-                                                    <div class="col-12">
+                                                    <div class="col-6">
                                                         <ul class="post-tags">
                                                             <li><i class="fa fa-tags"></i></li>
                                                             <?php
@@ -213,6 +276,9 @@ $categories = getAllCategories();
                                                             }
                                                             ?>
                                                         </ul>
+                                                    </div>
+                                                    <div class="col-6 text-right">
+                                                        <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>" class="read-more">Read More <i class="fa fa-arrow-right"></i></a>
                                                     </div>
                                                 </div>
                                             </div>
