@@ -77,42 +77,87 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         // Update Avatar
         elseif ($_POST['action'] === 'update_avatar') {
-            if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === 0) {
-                $allowed = ['jpg', 'jpeg', 'png', 'gif'];
-                $filename = $_FILES['avatar']['name'];
-                $filetype = pathinfo($filename, PATHINFO_EXTENSION);
+            if (isset($_POST['cropped_data']) && !empty($_POST['cropped_data'])) {
+                // Handle cropped image data
+                $cropped_data = $_POST['cropped_data'];
                 
-                if (in_array(strtolower($filetype), $allowed)) {
-                    $new_filename = 'avatar_' . $user_id . '.' . $filetype;
-                    $upload_path = 'uploads/avatars/' . $new_filename;
-                    
-                    // Create directory if it doesn't exist
-                    if (!file_exists('uploads/avatars')) {
-                        mkdir('uploads/avatars', 0777, true);
+                // Get image data from base64 string
+                list($type, $cropped_data) = explode(';', $cropped_data);
+                list(, $cropped_data) = explode(',', $cropped_data);
+                $cropped_data = base64_decode($cropped_data);
+                
+                // Get file extension from mime type
+                list(, $mime) = explode(':', $type);
+                $extension = ($mime === 'image/jpeg') ? 'jpg' : 
+                           (($mime === 'image/png') ? 'png' : 
+                           (($mime === 'image/gif') ? 'gif' : 'jpg'));
+                
+                // Create new filename
+                $new_filename = 'avatar_' . $user_id . '.' . $extension;
+                $upload_path = 'uploads/avatars/' . $new_filename;
+                
+                // Create directory if it doesn't exist
+                if (!file_exists('uploads/avatars')) {
+                    mkdir('uploads/avatars', 0777, true);
+                }
+                
+                // Delete old avatar if exists
+                if (!empty($user['avatar'])) {
+                    $old_file = $user['avatar'];
+                    if (file_exists($old_file)) {
+                        unlink($old_file);
                     }
-                    
-                    if (move_uploaded_file($_FILES['avatar']['tmp_name'], $upload_path)) {
-                        // Update database with new avatar path
-                        $sql = "UPDATE users SET avatar = ? WHERE id = ?";
+                }
+                
+                // Save the cropped image
+                if (file_put_contents($upload_path, $cropped_data)) {
+                    // Update database with new avatar path
+                    $sql = "UPDATE users SET avatar = ? WHERE id = ?";
+                    $stmt = $conn->prepare($sql);
+                    $stmt->bind_param("si", $upload_path, $user_id);
+                    if ($stmt->execute()) {
+                        $avatar_success = "Avatar updated successfully.";
+                        
+                        // Refresh user data
+                        $sql = "SELECT * FROM users WHERE id = ?";
                         $stmt = $conn->prepare($sql);
-                        $stmt->bind_param("si", $upload_path, $user_id);
-                        if ($stmt->execute()) {
-                            $avatar_success = "Avatar updated successfully.";
-                            
-                            // Refresh user data
-                            $sql = "SELECT * FROM users WHERE id = ?";
-                            $stmt = $conn->prepare($sql);
-                            $stmt->bind_param("i", $user_id);
-                            $stmt->execute();
-                            $user = $stmt->get_result()->fetch_assoc();
-                        } else {
-                            $avatar_error = "Failed to update avatar in database.";
-                        }
+                        $stmt->bind_param("i", $user_id);
+                        $stmt->execute();
+                        $user = $stmt->get_result()->fetch_assoc();
                     } else {
-                        $avatar_error = "Failed to upload avatar.";
+                        $avatar_error = "Failed to update avatar in database.";
                     }
                 } else {
-                    $avatar_error = "Invalid file type. Allowed types: JPG, JPEG, PNG, GIF";
+                    $avatar_error = "Failed to save cropped image.";
+                }
+            } else {
+                $avatar_error = "No cropped image data received.";
+            }
+        }
+        // Remove Avatar
+        elseif ($_POST['action'] === 'remove_avatar') {
+            // Delete the existing avatar file
+            if (!empty($user['avatar'])) {
+                $old_file = $user['avatar'];
+                if (file_exists($old_file)) {
+                    unlink($old_file);
+                }
+                
+                // Update database to remove avatar path
+                $sql = "UPDATE users SET avatar = NULL WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("i", $user_id);
+                if ($stmt->execute()) {
+                    $avatar_success = "Profile picture removed successfully.";
+                    
+                    // Refresh user data
+                    $sql = "SELECT * FROM users WHERE id = ?";
+                    $stmt = $conn->prepare($sql);
+                    $stmt->bind_param("i", $user_id);
+                    $stmt->execute();
+                    $user = $stmt->get_result()->fetch_assoc();
+                } else {
+                    $avatar_error = "Failed to remove profile picture.";
                 }
             }
         }
@@ -128,9 +173,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>User Settings - NetPy Blog</title>
     <link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i&display=swap" rel="stylesheet">
     <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="assets/css/fontawesome.css">
     <link rel="stylesheet" href="assets/css/templatemo-stand-blog.css">
     <link rel="stylesheet" href="assets/css/owl.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
     <style>
         .settings-section {
             margin-bottom: 40px;
@@ -166,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border-radius: 50%;
             overflow: hidden;
             margin: 0 auto 20px;
-            border: 3px solid #f48840;
+            border: 3px solid #0047cc;
         }
         .avatar-preview img {
             width: 100%;
@@ -175,6 +222,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .avatar-upload {
             text-align: center;
+        }
+        /* Cropper Modal Styles */
+        .crop-modal {
+            display: none;  /* Default state is hidden */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100vh;
+            background-color: rgba(0,0,0,0.9);
+            overflow: auto;
+        }
+        .crop-modal.show {  /* Add show class for when modal should be visible */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .crop-modal-content {
+            background-color: #fefefe;
+            padding: 30px;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: relative;
+            max-height: 90vh;
+            overflow: auto;
+        }
+        .crop-container {
+            max-width: 100%;
+            height: 400px;
+            margin-bottom: 20px;
+            background-color: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .crop-container img {
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+        }
+        .crop-preview {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            overflow: hidden;
+            margin: 20px auto;
+            border: 3px solid #0047cc;
+            background-color: #f0f0f0;
+        }
+        .crop-buttons {
+            text-align: center;
+            margin-top: 20px;
+            padding-bottom: 10px;
+        }
+        .crop-buttons .main-button {
+            display: inline-block;
+            margin: 0 8px;
+            min-width: 120px;
+            font-size: 13px;
+            color: #fff;
+            background-color: #0047cc;
+            padding: 12px 25px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .crop-buttons .main-button:hover {
+            background-color: #0052e6;
+        }
+        .crop-buttons .cancel-button {
+            background-color: #6c757d;
+        }
+        .crop-buttons .cancel-button:hover {
+            background-color: #7f8890;
+        }
+        .remove-button {
+            background-color: #dc3545 !important;
+        }
+        .remove-button:hover {
+            background-color: #c82333 !important;
         }
     </style>
 </head>
@@ -223,12 +357,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <div class="avatar-preview">
                                     <img src="<?php echo !empty($user['avatar']) ? $user['avatar'] : 'assets/images/default-avatar.png'; ?>" alt="Profile Picture">
                                 </div>
-                                <form action="user-settings.php" method="post" enctype="multipart/form-data">
+                                <form action="user-settings.php" method="post" enctype="multipart/form-data" id="avatar-form">
                                     <input type="hidden" name="action" value="update_avatar">
+                                    <input type="hidden" name="cropped_data" id="cropped_data">
                                     <div class="avatar-upload">
                                         <input type="file" name="avatar" id="avatar" accept="image/*" style="display: none;">
                                         <button type="button" class="main-button" onclick="document.getElementById('avatar').click()">Choose Image</button>
                                         <button type="submit" class="main-button" style="margin-left: 10px;">Upload</button>
+                                        <?php if (!empty($user['avatar'])): ?>
+                                            <button type="submit" name="action" value="remove_avatar" class="main-button remove-button" style="margin-left: 10px;" onclick="return confirm('Are you sure you want to remove your profile picture?')">Remove Picture</button>
+                                        <?php endif; ?>
                                     </div>
                                 </form>
                             </div>
@@ -342,10 +480,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </section>
 
+    <!-- Crop Modal -->
+    <div id="cropModal" class="crop-modal">
+        <div class="crop-modal-content">
+            <div class="crop-container">
+                <img id="cropImage" src="" alt="Crop Preview">
+            </div>
+            <div class="crop-preview"></div>
+            <div class="crop-buttons">
+                <button class="main-button" onclick="applyCrop()">Apply Changes</button>
+                <button class="main-button cancel-button" onclick="cancelCrop()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <?php include 'includes/footer.php'; ?>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
     <script>
+        let cropper = null;
+
         $(document).ready(function() {
             // Password toggle functionality
             $('.toggle-password').click(function() {
@@ -361,18 +516,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             });
 
-            // Preview avatar image before upload
+            // Preview and crop avatar image before upload
             $('#avatar').change(function() {
                 const file = this.files[0];
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        $('.avatar-preview img').attr('src', e.target.result);
+                        // Show crop modal
+                        $('#cropModal').addClass('show');
+                        $('#cropImage').attr('src', e.target.result);
+                        
+                        // Initialize cropper
+                        if (cropper) {
+                            cropper.destroy();
+                        }
+                        
+                        cropper = new Cropper($('#cropImage')[0], {
+                            aspectRatio: 1,
+                            viewMode: 1,
+                            dragMode: 'move',
+                            autoCropArea: 1,
+                            cropBoxResizable: false,
+                            cropBoxMovable: false,
+                            guides: false,
+                            center: false,
+                            highlight: false,
+                            background: false,
+                            preview: '.crop-preview'
+                        });
                     }
                     reader.readAsDataURL(file);
                 }
             });
         });
+
+        function applyCrop() {
+            if (cropper) {
+                // Get cropped canvas
+                const canvas = cropper.getCroppedCanvas({
+                    width: 300,
+                    height: 300
+                });
+                
+                // Convert to base64 and set preview
+                const croppedData = canvas.toDataURL();
+                $('.avatar-preview img').attr('src', croppedData);
+                $('#cropped_data').val(croppedData);
+                
+                // Close modal and cleanup
+                closeCropModal();
+            }
+        }
+
+        function cancelCrop() {
+            $('#avatar').val('');
+            closeCropModal();
+        }
+
+        function closeCropModal() {
+            $('#cropModal').removeClass('show');
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+        }
     </script>
 </body>
 </html> 

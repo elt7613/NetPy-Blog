@@ -17,12 +17,15 @@ $sql = "SELECT * FROM categories
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $category_slug);
 $stmt->execute();
-$category = $stmt->get_result()->fetch_assoc();
+$current_category = $stmt->get_result()->fetch_assoc();
 
-if (!$category) {
+if (!$current_category) {
     header('Location: index.php');
     exit();
 }
+
+// Debug category data
+error_log("Category Data after fetch: " . print_r($current_category, true));
 
 // Get current page number
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -43,7 +46,7 @@ $count_sql = "SELECT COUNT(*) as total
               AND u.deleted_at IS NULL 
               AND u.is_active = 1";
 $stmt = $conn->prepare($count_sql);
-$stmt->bind_param("i", $category['id']);
+$stmt->bind_param("i", $current_category['id']);
 $stmt->execute();
 $total_posts = $stmt->get_result()->fetch_assoc()['total'];
 $total_pages = ceil($total_posts / $posts_per_page);
@@ -73,12 +76,21 @@ $sql = "SELECT p.*, c.name as category_name, u.username as author_name,
         LIMIT ? OFFSET ?";
 
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("iii", $category['id'], $posts_per_page, $offset);
+$stmt->bind_param("iii", $current_category['id'], $posts_per_page, $offset);
 $stmt->execute();
 $posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // Get all categories for sidebar
 $categories = getAllCategories();
+
+// Debug category data
+error_log("Category Data before header: " . print_r($current_category, true));
+
+// Include header
+include 'includes/header.php';
+
+// Debug category data after header
+error_log("Category Data after header: " . print_r($current_category, true));
 ?>
 
 <!DOCTYPE html>
@@ -86,11 +98,11 @@ $categories = getAllCategories();
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="Posts in category <?php echo htmlspecialchars($category['name']); ?>">
+    <meta name="description" content="Posts in category <?php echo htmlspecialchars($current_category['name']); ?>">
     <meta name="author" content="">
     <link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i&display=swap" rel="stylesheet">
 
-    <title><?php echo htmlspecialchars($category['name']); ?> - NetPy Blog</title>
+    <title><?php echo htmlspecialchars($current_category['name']); ?>- NetPy Blog</title>
 
     <!-- Bootstrap core CSS -->
     <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
@@ -176,11 +188,12 @@ $categories = getAllCategories();
     </div>  
     <!-- ***** Preloader End ***** -->
 
-    <!-- Header -->
-    <?php include 'includes/header.php'; ?>
-
     <!-- Page Content -->
     <!-- Banner Starts Here -->
+    <?php
+    // Debug category data before heading
+    error_log("Category Data before heading: " . print_r($current_category, true));
+    ?>
     <div class="heading-page header-text">
         <section class="page-heading">
             <div class="container">
@@ -188,7 +201,7 @@ $categories = getAllCategories();
                     <div class="col-lg-12">
                         <div class="text-content">
                             <h4>Category</h4>
-                            <h2><?php echo htmlspecialchars($category['name']); ?></h2>
+                            <h2><?php echo htmlspecialchars($current_category['name']); ?></h2>
                         </div>
                     </div>
                 </div>
