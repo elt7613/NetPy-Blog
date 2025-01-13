@@ -5,7 +5,7 @@ require_once 'functions.php';
 // Get tag slug from URL
 $tag_slug = isset($_GET['slug']) ? sanitizeInput($_GET['slug']) : '';
 if (empty($tag_slug)) {
-    header('Location: index.php');
+    header('Location: home.php');
     exit;
 }
 
@@ -20,7 +20,7 @@ $stmt->execute();
 $tag = $stmt->get_result()->fetch_assoc();
 
 if (!$tag) {
-    header('Location: index.php');
+    header('Location: home.php');
     exit();
 }
 

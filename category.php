@@ -5,7 +5,7 @@ require_once 'functions.php';
 // Get category slug from URL
 $category_slug = isset($_GET['slug']) ? sanitizeInput($_GET['slug']) : '';
 if (empty($category_slug)) {
-    header('Location: index.php');
+    header('Location: home.php');
     exit;
 }
 
@@ -20,7 +20,7 @@ $stmt->execute();
 $current_category = $stmt->get_result()->fetch_assoc();
 
 if (!$current_category) {
-    header('Location: index.php');
+    header('Location: home.php');
     exit();
 }
 

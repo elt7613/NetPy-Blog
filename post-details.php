@@ -5,14 +5,14 @@ require_once 'functions.php';
 // Get post slug from URL
 $slug = isset($_GET['slug']) ? sanitizeInput($_GET['slug']) : '';
 if (empty($slug)) {
-    header('Location: index.php');
+    header('Location: home.php');
     exit;
 }
 
 // Get post details
 $post = getPostBySlug($slug);
 if (!$post) {
-    header('Location: index.php');
+    header('Location: home.php');
     exit;
 }
 

@@ -13,7 +13,7 @@ if (isLoggedIn()) {
             exit;
         }
     }
-    header('Location: index.php');
+    header('Location: home.php');
     exit;
 }
 
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
-                header('Location: index.php');
+                header('Location: home.php');
                 exit;
             } else {
                 $error = "Registration failed. Please try again.";

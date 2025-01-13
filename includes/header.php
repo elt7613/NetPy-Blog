@@ -30,6 +30,8 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
 
     <!-- Bootstrap core CSS -->
     <link href="<?php echo $base_url; ?>vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <!-- Additional CSS Files -->
     <link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i&display=swap" rel="stylesheet">
@@ -156,7 +158,7 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                             <a class="nav-link" href="https://netpy.in/" target="_blank">Explore NetPy</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="<?php echo $base_url; ?>index.php">Blogs</a>
+                            <a class="nav-link" href="<?php echo $base_url; ?>home.php">Blogs</a>
                         </li>
                         <li class="nav-item categories-dropdown">
                             <a class="nav-link" href="#">Categories</a>
@@ -222,6 +224,7 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
     <!-- Core JavaScript -->
     <script src="<?php echo $base_url; ?>vendor/jquery/jquery.min.js"></script>
     <script src="<?php echo $base_url; ?>vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
     <!-- Additional Scripts -->
     <script src="<?php echo $base_url; ?>assets/js/custom.js"></script>
