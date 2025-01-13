@@ -70,11 +70,11 @@ include 'includes/header.php';
         top: 50%;
         transform: translateY(-50%);
         width: 45%;
-        height: 400px;
+        height: 500px;
         z-index: 1;
     }
     .hero-slider .carousel-item {
-        height: 400px;
+        height: 500px;
     }
     .hero-slider .carousel-item img {
         height: 100%;
@@ -283,7 +283,7 @@ include 'includes/header.php';
         .hero-slider {
             position: relative;
             width: 100%;
-            height: 400px;
+            height: 500px;
             transform: none;
             top: auto;
             right: auto;
@@ -321,7 +321,7 @@ include 'includes/header.php';
             padding: 20px 15px 0;
         }
         .hero-slider {
-            height: 300px;
+            height: 400px;
             margin-top: 30px;
         }
         .hero-title {
@@ -385,6 +385,74 @@ include 'includes/header.php';
     .cta-button:hover {
         background: #0039a6;
         transform: translateY(-2px);
+    }
+    .carousel-inner {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+    }
+    
+    .carousel-item {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        display: none;
+        transition: transform 0.6s ease-in-out;
+    }
+    
+    .carousel-item.active,
+    .carousel-item-next,
+    .carousel-item-prev {
+        display: block;
+    }
+    
+    .carousel-item-next:not(.carousel-item-start),
+    .active.carousel-item-end {
+        transform: translateX(100%);
+    }
+    
+    .carousel-item-prev:not(.carousel-item-end),
+    .active.carousel-item-start {
+        transform: translateX(-100%);
+    }
+    
+    .carousel-item-next.carousel-item-start,
+    .carousel-item-prev.carousel-item-end {
+        transform: translateX(0);
+    }
+    
+    .hero-slider .carousel-inner {
+        height: 500px;
+    }
+    
+    .hero-slider .carousel-item {
+        height: 100%;
+    }
+    
+    .hero-slider .carousel-item img {
+        height: 100%;
+        width: 100%;
+        object-fit: cover;
+    }
+    
+    .carousel-fade .carousel-item {
+        opacity: 0;
+        transition: opacity 0.6s ease-in-out;
+    }
+    
+    .carousel-fade .carousel-item.active,
+    .carousel-fade .carousel-item-next.carousel-item-start,
+    .carousel-fade .carousel-item-prev.carousel-item-end {
+        opacity: 1;
+    }
+    
+    .carousel-fade .carousel-item-next,
+    .carousel-fade .carousel-item-prev,
+    .carousel-fade .carousel-item.active,
+    .carousel-fade .carousel-item-next.carousel-item-start,
+    .carousel-fade .carousel-item-prev.carousel-item-end {
+        transform: translateX(0);
     }
 </style>
 
@@ -529,6 +597,19 @@ document.addEventListener('DOMContentLoaded', function() {
             touch: true
         });
 
+        // Clone first and last items
+        const items = myCarousel.querySelectorAll('.carousel-item');
+        if (items.length > 1) {
+            const firstClone = items[0].cloneNode(true);
+            const lastClone = items[items.length - 1].cloneNode(true);
+            
+            firstClone.classList.remove('active');
+            lastClone.classList.remove('active');
+            
+            myCarousel.querySelector('.carousel-inner').appendChild(firstClone);
+            myCarousel.querySelector('.carousel-inner').insertBefore(lastClone, items[0]);
+        }
+
         // Add manual controls
         const prevButton = myCarousel.querySelector('.carousel-control-prev');
         const nextButton = myCarousel.querySelector('.carousel-control-next');
@@ -539,6 +620,19 @@ document.addEventListener('DOMContentLoaded', function() {
         
         nextButton.addEventListener('click', function() {
             carousel.next();
+        });
+
+        // Handle infinite loop
+        myCarousel.addEventListener('slid.bs.carousel', function(event) {
+            const items = this.querySelectorAll('.carousel-item');
+            const total = items.length;
+            const current = [...items].findIndex(item => item.classList.contains('active'));
+
+            if (current === total - 1) {
+                carousel.to(1);
+            } else if (current === 0) {
+                carousel.to(total - 2);
+            }
         });
     }
 });
