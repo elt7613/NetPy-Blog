@@ -247,37 +247,4 @@ function insertPostTags($post_id, $tag_ids) {
         $insert_stmt->close();
     }
 }
-
-function get_footer_categories($conn) {
-    $categories_sql = "SELECT c.*, COUNT(p.id) as post_count 
-                      FROM categories c 
-                      LEFT JOIN posts p ON c.id = p.category_id 
-                      AND p.status = 'published' 
-                      AND p.deleted_at IS NULL 
-                      AND p.is_active = 1
-                      WHERE c.deleted_at IS NULL 
-                      AND c.is_active = 1
-                      GROUP BY c.id 
-                      HAVING post_count > 0
-                      ORDER BY post_count DESC, c.name 
-                      LIMIT 10";
-    return $conn->query($categories_sql)->fetch_all(MYSQLI_ASSOC);
-}
-
-function get_footer_tags($conn) {
-    $tags_sql = "SELECT t.*, COUNT(DISTINCT pt.post_id) as post_count 
-                 FROM tags t 
-                 LEFT JOIN post_tags pt ON t.id = pt.tag_id 
-                 LEFT JOIN posts p ON pt.post_id = p.id 
-                 AND p.status = 'published' 
-                 AND p.deleted_at IS NULL 
-                 AND p.is_active = 1
-                 WHERE t.deleted_at IS NULL 
-                 AND t.is_active = 1
-                 GROUP BY t.id 
-                 HAVING post_count > 0 
-                 ORDER BY post_count DESC, t.name 
-                 LIMIT 10";
-    return $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
-}
 ?> 
