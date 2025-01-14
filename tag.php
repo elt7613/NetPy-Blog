@@ -110,17 +110,20 @@ $categories = getAllCategories();
     <style>
         @media (min-width: 992px) {
             .blog-posts .col-lg-4 {
-                padding-left: 80px;
+                padding-left: 0px;
             }
         }
 
         .blog-post {
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             transition: box-shadow 0.3s ease;
-            margin-bottom: 30px;
-            border-radius: 20px;
+            margin-bottom: 20px;
+            border-radius: 15px;
             overflow: hidden;
             background-color: #fff;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
         }
         
         .blog-post:hover {
@@ -137,8 +140,10 @@ $categories = getAllCategories();
         }
 
         .blog-post .blog-thumb img {
-            transition: transform 0.3s ease;
-            border-radius: 20px 20px 0 0;
+            border-radius: 15px 15px 0 0;
+            max-height: 300px;
+            width: 100%;
+            object-fit: cover;
         }
 
         .blog-post .blog-thumb:hover img {
@@ -215,16 +220,16 @@ $categories = getAllCategories();
                                                 <?php endif; ?>
                                             </div>
                                             <div class="down-content">
-                                                <span><?php echo htmlspecialchars($post['category_name']); ?></span>
+                                                <span style="font-size: 9px; margin-bottom: 0px;"><?php echo htmlspecialchars($post['category_name']); ?></span>
                                                 <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
-                                                    <h4><?php echo htmlspecialchars($post['title']); ?></h4>
+                                                    <h4 style="font-size: 1.2rem; margin-top: 5px; margin-bottom: 0px;"><?php echo htmlspecialchars($post['title']); ?></h4>
                                                 </a>
                                                 <ul class="post-info">
-                                                    <li><a href="#"><?php echo htmlspecialchars($post['author_name']); ?></a></li>
-                                                    <li><a href="#"><?php echo date('M d, Y', strtotime($post['created_at'])); ?></a></li>
-                                                    <li><a href="#"><?php echo $post['views']; ?> Views</a></li>
+                                                    <li><a href="#" style="font-size: 10px;"><?php echo htmlspecialchars($post['author_name']); ?></a></li>
+                                                    <li><a href="#" style="font-size: 10px;"><?php echo date('M d, Y', strtotime($post['created_at'])); ?></a></li>
+                                                    <li><a href="#" style="font-size: 10px;"><?php echo $post['views']; ?> Views</a></li>
                                                 </ul>
-                                                <div class="post-preview">
+                                                <div class="post-preview"  style="font-size: 0.9rem; color: #181818; margin-top: 5px;">
                                                     <?php 
                                                     $preview = strip_tags($post['content']);
                                                     echo strlen($preview) > 200 ? substr($preview, 0, 200) . '...' : $preview;

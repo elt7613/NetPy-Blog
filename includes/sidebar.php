@@ -40,12 +40,12 @@ $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) :
             <div class="col-lg-12">
                 <div class="sidebar-item search">
                     <form id="search_form" method="get" action="search.php">
-                        <input type="text" name="q" class="searchText" placeholder="type to search..." autocomplete="off">
+                        <input style="font-size: 0.8rem;" type="text" name="q" class="searchText" placeholder="Type to search..." autocomplete="off">
                     </form>
                 </div>
             </div>
             
-            <div class="col-lg-12">
+            <!-- <div class="col-lg-12">
                 <div class="sidebar-item recent-posts">
                     <div class="sidebar-heading">
                         <h2>Recent Posts</h2>
@@ -55,15 +55,15 @@ $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) :
                             <?php foreach ($sidebar_recent_posts as $post): ?>
                             <li>
                                 <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
-                                    <h5><?php echo htmlspecialchars($post['title']); ?></h5>
-                                    <span><?php echo date('M d, Y', strtotime($post['created_at'])); ?></span>
+                                    <h5 style="font-size: 1rem;"><?php echo htmlspecialchars($post['title']); ?></h5>
+                                    <span style="font-size: 0.8rem; margin-top: 0px;"><?php echo date('M d, Y', strtotime($post['created_at'])); ?></span>
                                 </a>
                             </li>
                             <?php endforeach; ?>
                         </ul>
                     </div>
                 </div>
-            </div>
+            </div> -->
             
             <div class="col-lg-12">
                 <div class="sidebar-item categories">
@@ -74,7 +74,7 @@ $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) :
                         <ul>
                             <?php foreach ($categories as $category): ?>
                             <li>
-                                <a href="category.php?slug=<?php echo urlencode($category['slug']); ?>">
+                                <a href="category.php?slug=<?php echo urlencode($category['slug']); ?>" style="font-size: 0.9rem;">
                                     - <?php echo htmlspecialchars($category['name']); ?>
                                 </a>
                             </li>
@@ -95,6 +95,7 @@ $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) :
                                 <?php foreach ($tags as $tag): ?>
                                 <li>
                                     <a href="tag.php?slug=<?php echo urlencode($tag['slug']); ?>" 
+                                        style="font-size: 0.9rem;"
                                        class="tag-<?php echo min(ceil($tag['post_count'] / 2), 5); ?>"
                                        title="<?php echo $tag['post_count']; ?> posts">
                                         <?php echo htmlspecialchars($tag['name']); ?>
