@@ -2,53 +2,6 @@
 require_once 'config.php';
 require_once 'functions.php';
 
-// Get current page number
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$posts_per_page = 10;
-$offset = ($page - 1) * $posts_per_page;
-
-// Get total number of published posts
-$count_sql = "SELECT COUNT(*) as total 
-              FROM posts p
-              LEFT JOIN categories c ON p.category_id = c.id 
-              LEFT JOIN users u ON p.author_id = u.id 
-              WHERE p.status = 'published'
-              AND p.deleted_at IS NULL 
-              AND p.is_active = 1
-              AND c.deleted_at IS NULL 
-              AND c.is_active = 1
-              AND u.deleted_at IS NULL 
-              AND u.is_active = 1";
-$total_posts = $conn->query($count_sql)->fetch_assoc()['total'];
-$total_pages = ceil($total_posts / $posts_per_page);
-
-// Ensure current page is within valid range
-$page = max(1, min($page, $total_pages));
-
-// Get published posts with pagination
-$sql = "SELECT p.*, c.name as category_name, u.username as author_name,
-        GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
-        FROM posts p 
-        LEFT JOIN categories c ON p.category_id = c.id 
-        LEFT JOIN users u ON p.author_id = u.id 
-        LEFT JOIN post_tags pt ON p.id = pt.post_id
-        LEFT JOIN tags t ON pt.tag_id = t.id AND t.deleted_at IS NULL AND t.is_active = 1
-        WHERE p.status = 'published'
-        AND p.deleted_at IS NULL 
-        AND p.is_active = 1
-        AND c.deleted_at IS NULL 
-        AND c.is_active = 1
-        AND u.deleted_at IS NULL 
-        AND u.is_active = 1
-        GROUP BY p.id, c.name, u.username, p.title, p.slug, p.content, p.created_at, p.image_path, p.views 
-        ORDER BY p.created_at DESC 
-        LIMIT ? OFFSET ?";
-
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("ii", $posts_per_page, $offset);
-$stmt->execute();
-$posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
 // Get featured posts
 $featured_sql = "SELECT p.*, c.name as category_name, u.username as author_name,
                 GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
@@ -69,26 +22,6 @@ $featured_sql = "SELECT p.*, c.name as category_name, u.username as author_name,
                 ORDER BY p.created_at DESC";
 $featured_posts = $conn->query($featured_sql)->fetch_all(MYSQLI_ASSOC);
 
-// Get recent posts
-$recent_sql = "SELECT p.*, c.name as category_name, u.username as author_name,
-              GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
-              FROM posts p 
-              LEFT JOIN categories c ON p.category_id = c.id 
-              LEFT JOIN users u ON p.author_id = u.id 
-              LEFT JOIN post_tags pt ON p.id = pt.post_id
-              LEFT JOIN tags t ON pt.tag_id = t.id AND t.deleted_at IS NULL AND t.is_active = 1
-              WHERE p.status = 'published' 
-              AND p.deleted_at IS NULL 
-              AND p.is_active = 1
-              AND c.deleted_at IS NULL 
-              AND c.is_active = 1
-              AND u.deleted_at IS NULL 
-              AND u.is_active = 1
-              GROUP BY p.id, c.name, u.username, p.title, p.slug, p.content, p.created_at, p.image_path, p.views
-              ORDER BY p.created_at DESC 
-              LIMIT 6";
-$recent_posts = $conn->query($recent_sql)->fetch_all(MYSQLI_ASSOC);
-
 // Get categories with post count
 $categories_sql = "SELECT c.*, COUNT(p.id) as post_count 
                   FROM categories c 
@@ -99,53 +32,56 @@ $categories_sql = "SELECT c.*, COUNT(p.id) as post_count
                   WHERE c.deleted_at IS NULL 
                   AND c.is_active = 1
                   GROUP BY c.id 
+                  HAVING post_count > 0
                   ORDER BY c.name";
-$categories = $conn->query($categories_sql)->fetch_all(MYSQLI_ASSOC);
+$categories_result = $conn->query($categories_sql);
+$categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) : [];
 
-// Get tags with post count
-$tags_sql = "SELECT t.*, COUNT(DISTINCT pt.post_id) as post_count 
-             FROM tags t 
-             LEFT JOIN post_tags pt ON t.id = pt.tag_id 
-             LEFT JOIN posts p ON pt.post_id = p.id 
-             AND p.status = 'published' 
-             AND p.deleted_at IS NULL 
-             AND p.is_active = 1
-             WHERE t.deleted_at IS NULL 
-             AND t.is_active = 1
-             GROUP BY t.id 
-             HAVING post_count > 0 
-             ORDER BY post_count DESC, t.name 
-             LIMIT 10";
-$tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
+// Get all published posts
+$posts_sql = "SELECT p.*, c.name as category_name, c.slug as category_slug, u.username as author_name,
+              GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags,
+              GROUP_CONCAT(DISTINCT t.slug ORDER BY t.name ASC SEPARATOR ', ') as tag_slugs
+              FROM posts p 
+              LEFT JOIN categories c ON p.category_id = c.id 
+              LEFT JOIN users u ON p.author_id = u.id 
+              LEFT JOIN post_tags pt ON p.id = pt.post_id
+              LEFT JOIN tags t ON pt.tag_id = t.id AND t.deleted_at IS NULL AND t.is_active = 1
+              WHERE p.status = 'published'
+              AND p.deleted_at IS NULL 
+              AND p.is_active = 1
+              AND c.deleted_at IS NULL 
+              AND c.is_active = 1
+              AND u.deleted_at IS NULL 
+              AND u.is_active = 1
+              GROUP BY p.id, c.name, c.slug, u.username, p.title, p.slug, p.content, p.created_at, p.image_path, p.views
+              ORDER BY p.created_at DESC";
+$posts_result = $conn->query($posts_sql);
+$posts = $posts_result ? $posts_result->fetch_all(MYSQLI_ASSOC) : [];
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
-    <meta name="author" content="TemplateMo">
-    <link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i&display=swap" rel="stylesheet">
 
-    <title>NetPy Blog - Home Page</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetPy | Blog</title>
 
     <!-- Bootstrap core CSS -->
     <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Additional CSS Files -->
     <link rel="stylesheet" href="assets/css/fontawesome.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="assets/css/templatemo-stand-blog.css">
     <link rel="stylesheet" href="assets/css/owl.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 
-    <style>
-        @media (min-width: 992px) {
-            .blog-posts .col-lg-4 {
-                padding-left: 0px;
-            }
-        }
-    </style>
+    <link rel="icon" type="image/png" href="images/fav-icon.jpg">
+    <link rel="stylesheet" href="blog_page_css/section_1.css">
+    <link rel="stylesheet" href="blog_page_css/section_2.css">
+
+    <link href='http://fonts.googleapis.com/css?family=Roboto' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Urbanist' rel='stylesheet'>
 </head>
 
 <body>
@@ -162,160 +98,298 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
     <!-- Header -->
     <?php include 'includes/header.php'; ?>
 
-    <!-- Page Content -->
-    <!-- Banner Starts Here -->
-    <div class="main-banner header-text">
-        <div class="container-fluid">
-            <div class="owl-banner owl-carousel">
+    <!--==================== SECTION 1 ===========================-->
+    <section class="section-1">
+        <div class="hero">
+            <div class="slider-container">
                 <?php foreach ($featured_posts as $post): ?>
-                <div class="item">
-                    <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>" class="item-link">
+                <div class="slide">
+                    <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
                         <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
-                        <div class="item-content">
-                            <div class="main-content">
-                                <div class="meta-category">
-                                    <span><?php echo htmlspecialchars($post['category_name']); ?></span>
-                                </div>
-                                <h4><?php echo htmlspecialchars($post['title']); ?></h4>
-                                <ul class="post-info">
-                                    <li><?php echo htmlspecialchars($post['author_name']); ?></li>
-                                    <li><?php echo date('M d, Y', strtotime($post['created_at'])); ?></li>
-                                    <li><?php echo $post['views']; ?> Views</li>
-                                </ul>
+                        <div class="hero-content">
+                            <div class="meta-category">
+                                <span><?php echo htmlspecialchars($post['category_name']); ?></span>
                             </div>
+                            <h1><?php echo htmlspecialchars($post['title']); ?></h1>
+                            <ul class="post-info">
+                                <li><?php echo htmlspecialchars($post['author_name']); ?></li>
+                                <li><?php echo date('M d, Y', strtotime($post['created_at'])); ?></li>
+                                <li><?php echo $post['views']; ?> Views</li>
+                            </ul>
                         </div>
                     </a>
                 </div>
                 <?php endforeach; ?>
             </div>
-        </div>
-    </div>
-    <!-- Banner Ends Here -->
 
-    <section class="blog-posts">
-        <div class="container">
-            <div class="row">
-                <div class="col-lg-8">
-                    <div class="all-blog-posts">
-                        <div class="row">
-                            <?php foreach ($posts as $post): ?>
-                            <div class="col-lg-12">
-                                <div class="blog-post">
-                                    <div class="blog-thumb">
-                                        <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
-                                            <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
-                                        </a>
-                                    </div>
-                                    <div class="down-content">
-                                        <span style="font-size: 9px; margin-bottom: 0px;"><?php echo htmlspecialchars($post['category_name']); ?></span>
-                                        <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
-                                            <h4 style="font-size: 1.3rem; margin-top: 5px; margin-bottom: 0px;"><?php echo htmlspecialchars($post['title']); ?></h4>
-                                        </a>
-                                        <ul class="post-info">
-                                            <li><a href="#" style="font-size: 10px;"><?php echo htmlspecialchars($post['author_name']); ?></a></li>
-                                            <li><a href="#" style="font-size: 10px;"><?php echo date('M d, Y', strtotime($post['created_at'])); ?></a></li>
-                                            <li><a href="#" style="font-size: 10px;"><?php echo $post['views']; ?> Views</a></li>
-                                        </ul>
-                                        <div class="post-preview" style="font-size: 0.9rem; color: #181818; margin-top: 5px;">
-                                            <?php 
-                                            $preview = strip_tags($post['content']);
-                                            echo strlen($preview) > 200 ? substr($preview, 0, 200) . '...' : $preview;
-                                            ?>
-                                        </div>
-                                        <div class="post-options">
-                                            <div class="row">
-                                                <div class="col-6">
-                                                    <ul class="post-tags">
-                                                        <li><i class="fa fa-tags"></i></li>
-                                                        <?php
-                                                        // Get post tags
-                                                        $sql = "SELECT t.name, t.slug 
-                                                                FROM tags t 
-                                                                JOIN post_tags pt ON t.id = pt.tag_id 
-                                                                WHERE pt.post_id = ?";
-                                                        $stmt = $conn->prepare($sql);
-                                                        $stmt->bind_param("i", $post['id']);
-                                                        $stmt->execute();
-                                                        $post_tags = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-                                                        
-                                                        if (!empty($post_tags)) {
-                                                            foreach ($post_tags as $index => $tag) {
-                                                                echo '<li><a href="tag.php?slug=' . urlencode($tag['slug']) . '">' . 
-                                                                     htmlspecialchars($tag['name']) . '</a>';
-                                                                if ($index < count($post_tags) - 1) {
-                                                                    echo ', ';
-                                                                }
-                                                                echo '</li>';
-                                                            }
-                                                        } else {
-                                                            echo '<li>No tags</li>';
-                                                        }
-                                                        ?>
-                                                    </ul>
-                                                </div>
-                                                <div class="col-6 text-right">
-                                                    <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>" class="read-more">Read More <i class="fa fa-arrow-right"></i></a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
-                            
-                            <!-- Pagination -->
-                            <?php if ($total_pages > 1): ?>
-                            <div class="pagination justify-content-center mt-4">
-                                <nav aria-label="Page navigation">
-                                    <ul class="pagination">
-                                        <?php if ($page > 1): ?>
-                                            <li class="page-item">
-                                                <a class="page-link" href="?page=1" aria-label="First">
-                                                    <span aria-hidden="true">&laquo;&laquo;</span>
-                                                </a>
-                                            </li>
-                                            <li class="page-item">
-                                                <a class="page-link" href="?page=<?php echo $page-1; ?>" aria-label="Previous">
-                                                    <span aria-hidden="true">&laquo;</span>
-                                                </a>
-                                            </li>
-                                        <?php endif; ?>
-
-                                        <?php
-                                        $start_page = max(1, $page - 2);
-                                        $end_page = min($total_pages, $page + 2);
-
-                                        for ($i = $start_page; $i <= $end_page; $i++):
-                                        ?>
-                                            <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
-                                                <a class="page-link" href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
-                                            </li>
-                                        <?php endfor; ?>
-
-                                        <?php if ($page < $total_pages): ?>
-                                            <li class="page-item">
-                                                <a class="page-link" href="?page=<?php echo $page+1; ?>" aria-label="Next">
-                                                    <span aria-hidden="true">&raquo;</span>
-                                                </a>
-                                            </li>
-                                            <li class="page-item">
-                                                <a class="page-link" href="?page=<?php echo $total_pages; ?>" aria-label="Last">
-                                                    <span aria-hidden="true">&raquo;&raquo;</span>
-                                                </a>
-                                            </li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </nav>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Sidebar -->
-                <?php include 'includes/sidebar.php'; ?>
+            <div class="slider-arrows">
+                <button class="arrow prev">❮</button>
+                <button class="arrow next">❯</button>
             </div>
         </div>
+
+        <div class="slider-dots">
+            <?php foreach ($featured_posts as $index => $post): ?>
+            <div class="dot <?php echo $index === 0 ? 'active' : ''; ?>"></div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+
+    <!--==================== SECTION 2 ===========================-->
+    <section class="section-2">
+        <div class="search-container">
+            <input type="text" class="search-input" placeholder="Search blogs...">
+            <button class="search-button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24">
+                    <path fill="white" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5S14 7.01 14 9.5S11.99 14 9.5 14" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="tags-container">
+            <span class="tag active" data-category="all">All Posts</span>
+            <?php 
+            $category_count = 0;
+            foreach ($categories as $category): 
+                if ($category_count < 10):
+            ?>
+                <span class="tag" data-category="<?php echo htmlspecialchars($category['slug']); ?>">
+                    <?php echo htmlspecialchars($category['name']); ?>
+                </span>
+            <?php 
+                endif;
+                $category_count++;
+            endforeach; 
+            
+            if (count($categories) > 10):
+            ?>
+                <span class="tag show-more-btn">Show More...</span>
+            <?php endif; ?>
+        </div>
+
+        <!-- Categories Popup -->
+        <div class="categories-popup" id="categoriesPopup">
+            <div class="popup-content">
+                <div class="popup-header">
+                    <h2>All Categories</h2>
+                    <span class="close-popup">&times;</span>
+                </div>
+                <div class="popup-categories">
+                    <span class="popup-tag active" data-category="all">All Posts</span>
+                    <?php foreach ($categories as $category): ?>
+                    <span class="popup-tag" data-category="<?php echo htmlspecialchars($category['slug']); ?>">
+                        <?php echo htmlspecialchars($category['name']); ?>
+                    </span>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+
+        <style>
+            .categories-popup {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 1000;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .popup-content {
+                background-color: white;
+                padding: 30px;
+                border-radius: 15px;
+                width: 90%;
+                max-width: 800px;
+                max-height: 80vh;
+                overflow-y: auto;
+                position: relative;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            }
+
+            .popup-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                padding-bottom: 15px;
+                border-bottom: 1px solid #eee;
+            }
+
+            .popup-header h2 {
+                margin: 0;
+                font-size: 1.5rem;
+                color: #333;
+            }
+
+            .close-popup {
+                font-size: 28px;
+                font-weight: bold;
+                color: #666;
+                cursor: pointer;
+                transition: color 0.3s;
+            }
+
+            .close-popup:hover {
+                color: #333;
+            }
+
+            .popup-categories {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .popup-tag {
+                padding: 8px 16px;
+                border: 1.5px solid #ccc;
+                border-radius: 20px;
+                font-size: 1rem;
+                font-weight: 400;
+                color: #0047CC;
+                cursor: pointer;
+                transition: all 0.3s;
+                white-space: nowrap;
+            }
+
+            .popup-tag:hover, .popup-tag.active {
+                background: #0047CC;
+                color: white;
+                border-color: #0047CC;
+            }
+
+            .show-more-btn {
+                background-color: #f8f9fa;
+                border: 1.5px solid #0047CC;
+                color: #0047CC;
+            }
+
+            .show-more-btn:hover {
+                background-color: #0047CC;
+                color: white;
+            }
+
+            /* Custom scrollbar for popup */
+            .popup-content::-webkit-scrollbar {
+                width: 6px;
+            }
+
+            .popup-content::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 10px;
+            }
+
+            .popup-content::-webkit-scrollbar-thumb {
+                background: #888;
+                border-radius: 10px;
+            }
+
+            .popup-content::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
+        </style>
+
+        <div class="blog-header">
+            <h1>Blogs - </h1>
+            <h1>
+                <span class="filter-type">All Posts</span>
+            </h1>
+        </div>
+
+        <div class="blog-grid" id="blogGrid">
+            <?php foreach ($posts as $post): ?>
+            <div class="blog-card visible" 
+                data-category="<?php echo htmlspecialchars($post['category_slug']); ?>"
+                data-category-name="<?php echo htmlspecialchars($post['category_name']); ?>"
+                data-tags="<?php echo htmlspecialchars($post['post_tags']); ?>"
+                data-tag-slugs="<?php echo htmlspecialchars($post['tag_slugs']); ?>">
+                <a href="post-details.php?slug=<?php echo urlencode($post['slug']); ?>">
+                    <img src="<?php echo htmlspecialchars($post['image_path']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>" class="blog-image">
+                    <div class="blog-content">
+                        <h3 class="blog-title"><?php echo htmlspecialchars($post['title']); ?></h3>
+                        <p class="blog-date">
+                            <span><?php echo htmlspecialchars($post['category_name']); ?></span> | 
+                            <?php echo date('M d, Y', strtotime($post['created_at'])); ?>
+                        </p>
+                        <?php if (!empty($post['post_tags'])): ?>
+                        <div class="blog-tags">
+                            <?php 
+                            $tags = explode(', ', $post['post_tags']);
+                            foreach ($tags as $tag): 
+                            ?>
+                            <span class="blog-tag"><?php echo htmlspecialchars($tag); ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+                        <span class="learn-more">Read More >></span>
+                    </div>
+                </a>
+            </div>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="blog-actions">
+            <button class="load-more" id="loadMore">Load More</button>
+            <button class="show-less" id="showLess" style="display: none;">Show Less...</button>
+        </div>
+
+        <style>
+            .blog-actions {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                align-items: center;
+                margin: 30px 0;
+            }
+
+            .load-more, .show-less {
+                display: block;
+                width: 200px;
+                padding: 12px 24px;
+                background: none;
+                color: #545657;
+                font-size: 1.2rem;
+                font-weight: 600;
+                border-radius: 25px;
+                cursor: pointer;
+                transition: all 0.3s;
+                text-align: center;
+            }
+
+            .load-more {
+                border: 1.5px solid #0047CC;
+            }
+
+            .show-less {
+                border: none;
+                color: #0047CC;
+            }
+
+            .load-more:hover {
+                background: #0047CC;
+                color: white;
+            }
+
+            .show-less:hover {
+                color: #0a3679;
+                text-decoration: underline;
+            }
+
+            @media screen and (max-width: 768px) {
+                .blog-actions {
+                    gap: 10px;
+                }
+
+                .load-more, .show-less {
+                    width: 150px;
+                    font-size: 1rem;
+                }
+            }
+        </style>
     </section>
 
     <!-- Footer -->
@@ -332,439 +406,33 @@ $tags = $conn->query($tags_sql)->fetch_all(MYSQLI_ASSOC);
     <script src="assets/js/isotope.js"></script>
     <script src="assets/js/accordions.js"></script>
 
+    <script src="blog_page_js/section_1.js"></script>
+    <script src="blog_page_js/section_2.js"></script>
+
     <script>
         $(document).ready(function() {
-            var owl = $('.owl-banner');
+            var owl = $('.owl-carousel');
             owl.owlCarousel({
-                items: 2,
+                items: 1,
                 loop: true,
                 dots: true,
                 nav: true,
-                navText: [
-                    '&#x2190;',
-                    '&#x2192;'
-                ],
                 autoplay: true,
-                autoplayTimeout: 8000,
-                autoplaySpeed: 1000,
-                autoplayHoverPause: true,
-                margin: 20,
-                slideBy: 1,
-                smartSpeed: 1000,
-                rewind: false,
-                lazyLoad: true,
-                stagePadding: 0,
-                responsive: {
-                    0: {
-                        items: 1,
-                        nav: true
-                    },
-                    600: {
-                        items: 2,
-                        nav: true
-                    },
-                    1000: {
-                        items: 2,
-                        nav: true
-                    }
-                }
+                autoplayTimeout: 5000,
+                autoplayHoverPause: true
             });
+        });
 
-            // Clone items for infinite loop
-            var $stage = owl.find('.owl-stage');
-            var stageItems = owl.find('.owl-item').clone(true);
-            $stage.append(stageItems);
-            owl.trigger('refresh.owl.carousel');
+        $('.custom-carousel').owlCarousel({
+            autoplay: true,
+            autoplayTimeout: 5000,
+            autoplayHoverPause: true,
+            items: 1,
+            nav: true,
+            dots: true,
+            loop: true
         });
     </script>
-
-    <style>
-        .owl-banner {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .owl-banner .owl-stage-outer {
-            overflow: hidden;
-        }
-
-        .owl-banner .owl-stage {
-            display: flex;
-            transition: all 1000ms ease;
-        }
-
-        .owl-banner .owl-item {
-            flex-shrink: 0;
-            opacity: 1;
-            transition: opacity 0.4s ease;
-        }
-
-        .owl-banner .owl-item.cloned {
-            opacity: 1;
-        }
-
-        .owl-banner .item {
-            position: relative;
-            max-width: 500px;
-            margin: 0 auto;
-            cursor: pointer;
-            transition: transform 0.3s ease;
-        }
-
-        .owl-banner .item:hover {
-            transform: translateY(-5px);
-        }
-
-        .owl-banner .item .item-link {
-            display: block;
-            text-decoration: none;
-            color: inherit;
-        }
-
-        .owl-banner .item img {
-            max-height: 300px;
-            object-fit: cover;
-            width: 100%;
-            display: block;
-        }
-
-        .owl-banner .item-content {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 20px;
-            color: #fff;
-            text-align: center;
-        }
-
-        .owl-banner .item-content h4 {
-            color: #fff;
-            margin: 10px 0;
-            font-size: 20px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .owl-banner .item-content .post-info {
-            margin: 0;
-            padding: 0;
-            list-style: none;
-        }
-
-        .owl-banner .item-content .post-info li {
-            display: inline-block;
-            margin-right: 15px;
-            font-size: 14px;
-            color: #fff;
-            font-weight: 500;
-        }
-
-        .owl-banner .meta-category span {
-            background: #0047cc;
-            padding: 5px 15px;
-            border-radius: 25px;
-            font-size: 12px;
-            font-weight: 500;
-            color: #fff;
-            display: inline-block;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .owl-banner .item::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%);
-            z-index: 1;
-        }
-
-        .owl-banner .item .item-link {
-            position: relative;
-            z-index: 2;
-        }
-
-        .owl-banner .item-content {
-            z-index: 2;
-        }
-
-        .owl-banner .owl-nav {
-            position: absolute;
-            top: 50%;
-            width: 100%;
-            transform: translateY(-50%);
-            z-index: 10;
-            display: block !important;
-        }
-
-        .owl-banner .owl-nav button {
-            position: absolute;
-            width: 45px;
-            height: 45px;
-            background: #0047cc !important;
-            border-radius: 50% !important;
-            outline: none;
-            transition: all 0.3s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            display: flex !important;
-            align-items: center;
-            justify-content: center;
-            padding: 0 !important;
-            color: #fff !important;
-            font-size: 28px !important;
-            font-weight: bold;
-            border: none !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-        }
-
-        .owl-banner .owl-nav button:hover {
-            background: #0047cc !important;
-            opacity: 0.8 !important;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-        }
-
-        .owl-banner .owl-nav button span {
-            background: transparent !important;
-            display: block !important;
-            width: auto !important;
-            height: auto !important;
-            border: none !important;
-            font-size: inherit !important;
-            color: inherit !important;
-            line-height: 1 !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-
-        .owl-banner .owl-nav .owl-prev {
-            left: 10px;
-        }
-
-        .owl-banner .owl-nav .owl-next {
-            right: 10px;
-        }
-
-        @media (max-width: 768px) {
-            .owl-banner .owl-nav {
-                display: block !important;
-            }
-            .owl-banner .owl-nav button {
-                width: 40px;
-                height: 40px;
-                font-size: 24px !important;
-                display: flex !important;
-            }
-            .owl-banner .owl-nav .owl-prev {
-                left: 5px;
-            }
-            .owl-banner .owl-nav .owl-next {
-                right: 5px;
-            }
-        }
-
-        /* Ensure dots are visible */
-        .owl-banner .owl-dots {
-            position: absolute;
-            bottom: 15px;
-            width: 100%;
-            text-align: center;
-            display: block !important;
-        }
-
-        .owl-banner .owl-dots .owl-dot {
-            display: inline-block;
-            margin: 0 5px;
-        }
-
-        .owl-banner .owl-dots .owl-dot span {
-            width: 12px;
-            height: 12px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            display: inline-block;
-            transition: all 0.3s;
-        }
-
-        .owl-banner .owl-dots .owl-dot.active span {
-            background: #fff;
-        }
-
-        /* Add styles for post info in slider */
-        .owl-banner .item .item-content .post-info {
-            padding: 0;
-            margin: 0;
-            list-style: none;
-        }
-
-        .owl-banner .item .item-content .post-info li {
-            display: inline-block;
-            margin-right: 8px;
-        }
-
-        .owl-banner .item .item-content .post-info li:after {
-            content: '|';
-            color: #fff;
-            margin-left: 8px;
-        }
-
-        .owl-banner .item .item-content .post-info li:last-child:after {
-            display: none;
-        }
-
-        .owl-banner .item .item-content .post-info li a {
-            font-size: 14px;
-            color: #fff;
-            font-weight: 500;
-            transition: all .3s;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-        }
-
-        .owl-banner .item .item-content .post-info li a:hover {
-            color: #0047cc;
-        }
-
-        .blog-post {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transition: box-shadow 0.3s ease;
-            margin-bottom: 20px;
-            border-radius: 15px;
-            overflow: hidden;
-            background-color: #fff;
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        
-        .blog-post:hover {
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-        }
-
-        .blog-post .blog-thumb img {
-            border-radius: 15px 15px 0 0;
-            max-height: 300px;
-            width: 100%;
-            object-fit: cover;
-        }
-
-        .down-content {
-            background-color: #fff;
-            padding: 20px;
-        }
-
-        .down-content span {
-            color: #0047cc !important;
-            font-size: 12px;
-        }
-
-        .down-content h4 {
-            color: #333333;
-            font-size: 20px;
-            margin: 10px 0;
-        }
-
-        .down-content ul.post-info {
-            margin-bottom: 15px;
-        }
-
-        .down-content ul.post-info li a {
-            font-size: 12px;
-        }
-
-        .blog-post .down-content .post-preview {
-            font-size: 14px;
-            line-height: 1.5;
-            margin-bottom: 15px;
-        }
-
-        .blog-post .post-options {
-            padding-top: 15px;
-        }
-
-        .blog-post .post-options ul.post-tags li a {
-            font-size: 12px;
-        }
-
-        .post-options ul.post-tags li a {
-            color: #333333;
-        }
-
-        .post-options ul.post-tags li a:hover {
-            color: #0047cc;
-        }
-
-        .sidebar-item .content ul li a {
-            color: #333333;
-        }
-
-        .sidebar-item .content ul li a:hover {
-            color: #0047cc;
-        }
-
-        .sidebar-heading h2 {
-            color: #333333;
-        }
-
-        .pagination .page-item.active .page-link {
-            background-color: #0047cc;
-            border-color: #0047cc;
-        }
-
-        .pagination .page-link {
-            color: #0047cc;
-        }
-
-        .pagination .page-link:hover {
-            background-color: #0047cc;
-            color: #fff;
-        }
-
-        .read-more {
-            display: inline-flex;
-            align-items: center;
-            color: #181818;
-            font-weight: 500;
-            font-size: 13px;
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-
-        .read-more i {
-            margin-left: 5px;
-            transition: transform 0.3s ease;
-            font-size: 12px;
-        }
-
-        .read-more:hover {
-            color: #0047cc;
-            text-decoration: none;
-        }
-
-        .read-more:hover i {
-            transform: translateX(5px);
-        }
-
-        .blog-thumb {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .blog-thumb a {
-            display: block;
-        }
-
-        .blog-thumb img {
-            transition: transform 0.3s ease;
-        }
-
-        .blog-thumb:hover img {
-            transform: scale(1.05);
-        }
-    </style>
 </body>
-</html> 
+
+</html>

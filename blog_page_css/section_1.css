@@ -1,0 +1,323 @@
+.section-1{
+    position: relative;
+    padding: 120px 10px 0 10px;
+    background: #fff;
+    width: 100%;
+    max-width: 1500px;
+    margin: 0 auto;
+    transition: all 0.5s ease;
+    font-family: "Roboto",sans-serif;
+    z-index: 1;
+}
+
+.section-1 .hero {
+    position: relative;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    height: 500px;
+    overflow: hidden;
+    transition: all 0.5s ease;
+}
+
+.section-1 .slider-container {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.5s ease-in-out;
+}
+
+.section-1 .slide {
+    position: relative;
+    min-width: 100%;
+    height: 100%;
+    transition: all 0.5s ease;
+}
+
+.section-1 .slide img {
+    width: 100%;
+    height: 100%;
+    border-radius: 20px;
+    object-fit: cover;
+    transition: all 0.5s ease;
+}
+
+.section-1 .hero-content {
+    position: absolute;
+    bottom: 40px;
+    left: 40px;
+    right: 40px;
+    color: #fff;
+    padding: 25px;
+    border-radius: 15px;
+    backdrop-filter: blur(15px) saturate(150%);
+    -webkit-backdrop-filter: blur(8px) saturate(100%);
+    background-color: rgba(0, 0, 0, 0.4);
+    transition: all 0.5s ease;
+    max-width: 800px;
+}
+
+.section-1 .hero-content .meta-category {
+    margin-bottom: 15px;
+}
+
+.section-1 .hero-content .meta-category span {
+    background: #0D47A1;
+    padding: 5px 10px;
+    border-radius: 25px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.section-1 .hero-content h1 {
+    font-size: 2.5rem;
+    margin: 0 0 15px 0;
+    font-weight: 700;
+    font-family: "Montserrat", sans-serif;
+    line-height: 1.2;
+}
+
+.section-1 .hero-content .post-info {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.section-1 .hero-content .post-info li {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.section-1 .hero-content .post-info li:not(:last-child):after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 4px;
+    background-color: rgba(255, 255, 255, 0.6);
+    border-radius: 50%;
+}
+
+.section-1 .learn-more-btn {
+    position: relative;
+    margin-left: auto;
+    margin-right: auto;
+    width: 200px;
+    height: 40px;
+    text-align: center;
+    display: block;
+    padding: 10px 20px;
+    background-color: #0D47A1;
+    color: white;
+    text-decoration: none;
+    text-align: center;
+    border-radius: 10px;
+    transition: background-color 0.3s;
+}
+
+.section-1 .learn-more-btn:hover {
+    background-color: transparent;
+    border: 1px solid #0D47A1;
+    color: #ffffffbe;
+}
+
+.section-1 .slider-dots {
+    position: absolute;
+    margin-top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 2;
+    transition: all 0.5s ease;
+}
+
+.section-1 .dot {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1.5px solid #0D47A1;
+    background-color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.section-1 .dot.active {
+    background-color: #0D47A1;
+    transition: all 0.5s ease;
+}
+
+.section-1 .slider-arrows {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.section-1 .arrow {
+    background-color: rgba(255, 255, 255, 0.8);
+    color: #0D47A1;
+    padding: 10px 15px;
+    width: 45px;
+    height: 45px;
+    text-align: center;
+    border: none;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.section-1 .arrow:hover {
+    background-color: #0D47A1;
+    color: white;
+}
+
+/* Media Queries */
+@media screen and (max-width: 768px) {
+    .section-1 .hero-content {
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        padding: 20px;
+    }
+
+    .section-1 .hero-content h1 {
+        font-size: 1.8rem;
+        margin-bottom: 10px;
+    }
+
+    .section-1 .hero-content .meta-category span {
+        padding: 6px 15px;
+        font-size: 12px;
+    }
+
+    .section-1 .hero-content .post-info {
+        gap: 15px;
+    }
+
+    .section-1 .hero-content .post-info li {
+        font-size: 12px;
+    }
+
+    .section-1 .arrow {
+        width: 35px;
+        height: 35px;
+        font-size: 1rem;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .section-1 .hero-content {
+        bottom: 15px;
+        left: 15px;
+        right: 15px;
+        padding: 15px;
+    }
+
+    .section-1 .hero-content h1 {
+        font-size: 1.5rem;
+    }
+
+    .section-1 .hero-content .post-info {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+}
+
+/* 320px */
+@media screen and (min-width: 320px){
+    .section-1 .hero-content {
+        top: 72%;
+        left: 5%;
+    }
+
+    .section-1 .hero-content h1 {
+        font-size: 1.7rem;
+    }
+    .section-1 .learn-more-btn {
+        width: 130px;
+    }
+}
+/* 425px */
+@media screen and (min-width: 425px){
+    .section-1 .hero-content {
+        top: 68%;
+        left: 5%;
+    }
+
+    .section-1 .hero-content h1 {
+        font-size: 2rem;
+    }
+    .section-1 .learn-more-btn {
+        width: 150px;
+    }
+}
+/* 768px */
+@media screen and (min-width: 768px){
+    .section-1 .hero-content {
+        top: 65%;
+    }
+
+    .section-1 .hero-content h1 {
+        font-size: 2.4rem;
+    }
+    .section-1 .learn-more-btn {
+        width: 180px;
+    }
+}
+/* 1024px */
+@media screen and (min-width: 1024px){
+    .section-1 .hero {
+        width: 85%;
+    }
+    .section-1 .hero-content {
+        top: 60%;
+    }
+
+    .section-1 .hero-content h1 {
+        font-size: 2.8rem;
+    }
+    .section-1 .learn-more-btn {
+        width: 200px;
+    }
+}
+/* 1440px */
+@media screen and (min-width: 1440px){
+    .section-1 .hero {
+        width: 70%;
+    }
+    .section-1 .hero-content {
+        top: 60%;
+    }
+
+    .section-1 .hero-content h1 {
+        font-size: 2.8rem;
+    }
+    .section-1 .learn-more-btn {
+        width: 200px;
+    }
+}
+

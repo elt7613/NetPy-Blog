@@ -5,6 +5,20 @@ $is_admin_page = strpos($current_path, '/admin/') !== false;
 $is_author_page = strpos($current_path, '/author/') !== false;
 $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
 
+// Get user's avatar if logged in
+$user_avatar = '';
+if (isLoggedIn()) {
+    $user_id = $_SESSION['user_id'];
+    $avatar_sql = "SELECT avatar FROM users WHERE id = ?";
+    $stmt = $conn->prepare($avatar_sql);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $avatar_result = $stmt->get_result();
+    if ($avatar_row = $avatar_result->fetch_assoc()) {
+        $user_avatar = $avatar_row['avatar'];
+    }
+}
+
 // Get categories with post count for the navbar
 $nav_categories_sql = "SELECT c.*, COUNT(p.id) as post_count 
                       FROM categories c 
@@ -133,6 +147,93 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
         .categories-menu ul li a:hover {
             color: #0047cc;
         }
+
+        /* Profile dropdown styles */
+        .profile-dropdown {
+            position: relative;
+        }
+
+        .profile-dropdown .nav-link {
+            padding: 0.5rem;
+            color: #181818;
+            display: flex;
+            align-items: center;
+        }
+
+        .profile-dropdown .profile-img {
+            position: relative;
+            top: -5px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        /* Hide profile image on mobile, show text links instead */
+        @media (max-width: 991px) {
+            .profile-dropdown {
+                display: none;
+            }
+            .mobile-profile-links {
+                display: block;
+            }
+        }
+
+        /* Hide text links on desktop, show profile dropdown instead */
+        @media (min-width: 992px) {
+            .profile-dropdown {
+                display: block;
+            }
+            .mobile-profile-links {
+                display: none;
+            }
+        }
+
+        .profile-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 180px;
+            z-index: 1000;
+        }
+
+        .profile-dropdown-menu ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .profile-dropdown-menu ul li {
+            padding: 8px 20px;
+        }
+
+        .profile-dropdown-menu ul li:hover {
+            background: #f8f9fa;
+        }
+
+        .profile-dropdown-menu ul li a {
+            color: #181818;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .profile-dropdown-menu ul li a:hover {
+            color: #0047cc;
+        }
+
+        /* Show profile dropdown menu on hover for desktop */
+        @media (min-width: 992px) {
+            .profile-dropdown:hover .profile-dropdown-menu {
+                display: block;
+            }
+        }
     </style>
 </head>
 
@@ -155,9 +256,6 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                 <div class="collapse navbar-collapse" id="navbarResponsive">
                     <ul class="navbar-nav ml-auto">
                         <li class="nav-item">
-                            <a class="nav-link" href="https://netpy.in/" target="_blank">Explore NetPy</a>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-link" href="<?php echo $base_url; ?>home.php">Blogs</a>
                         </li>
                         <li class="nav-item categories-dropdown">
@@ -175,41 +273,163 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                                 </ul>
                             </div>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="https://netpy.in/" target="_blank">Explore NetPy</a>
+                        </li>
                         <?php if (isLoggedIn()): ?>
                             <?php if (isAdmin()): ?>
-                                <li class="nav-item">
+                                <!-- Profile dropdown for desktop -->
+                                <li class="nav-item dropdown profile-dropdown">
+                                    <a class="nav-link" href="#" id="profileDropdown" role="button">
+                                        <?php if (!empty($user_avatar)): ?>
+                                            <img src="<?php echo $user_avatar; ?>" alt="Profile" class="profile-img">
+                                        <?php else: ?>
+                                            <img src="<?php echo $base_url; ?>assets/images/default-profile.png" alt="Default profile" class="profile-img">
+                                        <?php endif; ?>
+                                    </a>
+                                    <div class="profile-dropdown-menu">
+                                        <ul>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>admin/dashboard.php">
+                                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>admin/new-post.php">
+                                                    <i class="fas fa-plus"></i> New Post
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>admin/manage-users.php">
+                                                    <i class="fas fa-users"></i> Users
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>admin/manage-categories.php">
+                                                    <i class="fas fa-folder"></i> Categories
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>admin/manage-tags.php">
+                                                    <i class="fas fa-tags"></i> Tags
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>user-settings.php">
+                                                    <i class="fas fa-cog"></i> Settings
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>logout.php">
+                                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                                <!-- Mobile profile links -->
+                                <li class="nav-item mobile-profile-links">
                                     <a class="nav-link" href="<?php echo $base_url; ?>admin/dashboard.php">Dashboard</a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item mobile-profile-links">
                                     <a class="nav-link" href="<?php echo $base_url; ?>admin/new-post.php">New Post</a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item mobile-profile-links">
                                     <a class="nav-link" href="<?php echo $base_url; ?>admin/manage-users.php">Users</a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item mobile-profile-links">
                                     <a class="nav-link" href="<?php echo $base_url; ?>admin/manage-categories.php">Categories</a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item mobile-profile-links">
                                     <a class="nav-link" href="<?php echo $base_url; ?>admin/manage-tags.php">Tags</a>
                                 </li>
+                                <li class="nav-item mobile-profile-links">
+                                    <a class="nav-link" href="<?php echo $base_url; ?>user-settings.php">Settings</a>
+                                </li>
+                                <li class="nav-item mobile-profile-links">
+                                    <a class="nav-link" href="<?php echo $base_url; ?>logout.php">Logout</a>
+                                </li>
                             <?php elseif ($_SESSION['role'] === 'author'): ?>
-                                <li class="nav-item">
+                                <!-- Profile dropdown for desktop -->
+                                <li class="nav-item dropdown profile-dropdown">
+                                    <a class="nav-link" href="#" id="profileDropdown" role="button">
+                                        <?php if (!empty($user_avatar)): ?>
+                                            <img src="<?php echo $user_avatar; ?>" alt="Profile" class="profile-img">
+                                        <?php else: ?>
+                                            <img src="<?php echo $base_url; ?>assets/images/default-profile.png" alt="Default profile" class="profile-img">
+                                        <?php endif; ?>
+                                    </a>
+                                    <div class="profile-dropdown-menu">
+                                        <ul>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>author/dashboard.php">
+                                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>author/new-post.php">
+                                                    <i class="fas fa-plus"></i> New Post
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>user-settings.php">
+                                                    <i class="fas fa-cog"></i> Settings
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>logout.php">
+                                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                                <!-- Mobile profile links -->
+                                <li class="nav-item mobile-profile-links">
                                     <a class="nav-link" href="<?php echo $base_url; ?>author/dashboard.php">Dashboard</a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item mobile-profile-links">
                                     <a class="nav-link" href="<?php echo $base_url; ?>author/new-post.php">New Post</a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item mobile-profile-links">
                                     <a class="nav-link" href="<?php echo $base_url; ?>user-settings.php">Settings</a>
+                                </li>
+                                <li class="nav-item mobile-profile-links">
+                                    <a class="nav-link" href="<?php echo $base_url; ?>logout.php">Logout</a>
                                 </li>
                             <?php else: ?>
-                                <li class="nav-item">
+                                <!-- Profile dropdown for desktop -->
+                                <li class="nav-item dropdown profile-dropdown">
+                                    <a class="nav-link" href="#" id="profileDropdown" role="button">
+                                        <?php if (!empty($user_avatar)): ?>
+                                            <img src="<?php echo $user_avatar; ?>" alt="Profile" class="profile-img">
+                                        <?php else: ?>
+                                            <img src="<?php echo $base_url; ?>assets/images/default-profile.png" alt="Default profile" class="profile-img">
+                                        <?php endif; ?>
+                                    </a>
+                                    <div class="profile-dropdown-menu">
+                                        <ul>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>user-settings.php">
+                                                    <i class="fas fa-cog"></i> Settings
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo $base_url; ?>logout.php">
+                                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                                <!-- Mobile profile links -->
+                                <li class="nav-item mobile-profile-links">
                                     <a class="nav-link" href="<?php echo $base_url; ?>user-settings.php">Settings</a>
                                 </li>
+                                <li class="nav-item mobile-profile-links">
+                                    <a class="nav-link" href="<?php echo $base_url; ?>logout.php">Logout</a>
+                                </li>
                             <?php endif; ?>
-                            <li class="nav-item">
-                                <a class="nav-link" href="<?php echo $base_url; ?>logout.php">Logout</a>
-                            </li>
                         <?php else: ?>
                             <li class="nav-item">
                                 <a class="nav-link" href="<?php echo $base_url; ?>login.php">Login/Signup</a>
@@ -286,6 +506,27 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                     $navbar.collapse('hide');
                 });
             }
+
+            // Handle profile dropdown for both mobile and desktop
+            $('#profileDropdown').on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var $menu = $(this).siblings('.profile-dropdown-menu');
+                $('.profile-dropdown-menu').not($menu).hide();
+                $menu.toggle();
+            });
+
+            // Close profile dropdown when clicking outside
+            $(document).on('click', function(e) {
+                if (!$(e.target).closest('.profile-dropdown').length) {
+                    $('.profile-dropdown-menu').hide();
+                }
+            });
+
+            // Prevent dropdown clicks from closing the main menu
+            $('.profile-dropdown-menu').on('click', function(e) {
+                e.stopPropagation();
+            });
         });
     </script>
 </body>
