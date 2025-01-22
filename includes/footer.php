@@ -511,25 +511,39 @@ footer ul.social-icons {
 document.addEventListener('DOMContentLoaded', function() {
     const seeMoreButtons = document.querySelectorAll('.see-more');
     const modalElement = document.getElementById('seeMoreModal');
-    const modal = new bootstrap.Modal(modalElement);
+    let modalInstance;
+
+    // Initialize modal with a check for Bootstrap availability
+    function initializeModal() {
+        if (typeof bootstrap !== 'undefined') {
+            modalInstance = new bootstrap.Modal(modalElement);
+        } else {
+            console.error('Bootstrap is not loaded. Please ensure bootstrap.js is included.');
+            return false;
+        }
+        return true;
+    }
+
+    // Initialize modal
+    initializeModal();
     
     // Close button handler
     const closeButton = modalElement.querySelector('.btn-close');
     closeButton.addEventListener('click', () => {
-        modal.hide();
+        if (modalInstance) modalInstance.hide();
     });
     
     // Close on backdrop click
     modalElement.addEventListener('click', (e) => {
-        if (e.target === modalElement) {
-            modal.hide();
+        if (e.target === modalElement && modalInstance) {
+            modalInstance.hide();
         }
     });
     
     // Close on escape key
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modalElement.classList.contains('show')) {
-            modal.hide();
+        if (e.key === 'Escape' && modalElement.classList.contains('show') && modalInstance) {
+            modalInstance.hide();
         }
     });
     
@@ -538,12 +552,18 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const type = this.dataset.type;
             
+            // Check if modal is properly initialized
+            if (!modalInstance && !initializeModal()) {
+                alert('Unable to show modal. Please try again later.');
+                return;
+            }
+            
             // Set modal title
             document.querySelector('.modal-title').textContent = 
                 type === 'categories' ? 'All Categories' : 'All Tags';
             
             // Fetch all items
-            fetch(`ajax/get_${type}.php`)
+            fetch(`/ajax/get_${type}.php`)
                 .then(response => response.json())
                 .then(data => {
                     const modalContent = document.getElementById('modalContent');
@@ -552,7 +572,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     data.forEach(item => {
                         const li = document.createElement('li');
                         const a = document.createElement('a');
-                        a.href = `${type === 'categories' ? 'category' : 'tag'}.php?slug=${encodeURIComponent(item.slug)}`;
+                        a.href = `/${type === 'categories' ? 'category' : 'tag'}.php?slug=${encodeURIComponent(item.slug)}`;
                         a.textContent = item.name;
                         li.appendChild(a);
                         ul.appendChild(li);
@@ -560,7 +580,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     modalContent.innerHTML = '';
                     modalContent.appendChild(ul);
-                    modal.show();
+                    modalInstance.show();
                 })
                 .catch(error => console.error('Error:', error));
         });

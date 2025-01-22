@@ -303,7 +303,7 @@ $categories = getAllCategories();
             position: absolute;
             bottom: unset !important;
             top: -10px !important;
-            right: 0;
+            left: -100px !important;
             transform: translateY(-100%) !important;
             background-color: white;
             border-radius: 4px;
@@ -944,10 +944,10 @@ $categories = getAllCategories();
                                                     <ul class="post-share">
                                                         <li><i class="fa fa-share-alt"></i></li>
                                                         <li class="nav-item dropdown">
-                                                            <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+                                                            <a href="#" class="nav-link" id="shareDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                                                 Share
                                                             </a>
-                                                            <div class="dropdown-menu dropdown-menu-right share-menu">
+                                                            <div class="dropdown-menu dropdown-menu-left share-menu" aria-labelledby="shareDropdown">
                                                                 <?php
                                                                 $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
                                                                 $title = urlencode($post['title']);
@@ -956,16 +956,16 @@ $categories = getAllCategories();
                                                                 
                                                                 if (isLoggedIn()):
                                                                 ?>
-                                                                <a class="dropdown-item share-link" href="https://www.facebook.com/sharer/sharer.php?u=<?php echo $url; ?>" target="_blank">
+                                                                <a class="dropdown-item" href="https://www.facebook.com/sharer/sharer.php?u=<?php echo $url; ?>" target="_blank" rel="noopener noreferrer">
                                                                     <i class="fa fa-facebook"></i> Facebook
                                                                 </a>
-                                                                <a class="dropdown-item share-link" href="https://twitter.com/intent/tweet?url=<?php echo $url; ?>&text=<?php echo $title; ?>" target="_blank">
+                                                                <a class="dropdown-item" href="https://twitter.com/intent/tweet?url=<?php echo $url; ?>&text=<?php echo $title; ?>" target="_blank" rel="noopener noreferrer">
                                                                     <i class="fa fa-twitter"></i> Twitter
                                                                 </a>
-                                                                <a class="dropdown-item share-link" href="https://www.linkedin.com/shareArticle?mini=true&url=<?php echo $url; ?>&title=<?php echo $title; ?>" target="_blank">
+                                                                <a class="dropdown-item" href="https://www.linkedin.com/shareArticle?mini=true&url=<?php echo $url; ?>&title=<?php echo $title; ?>" target="_blank" rel="noopener noreferrer">
                                                                     <i class="fa fa-linkedin"></i> LinkedIn
                                                                 </a>
-                                                                <a class="dropdown-item share-link" href="https://api.whatsapp.com/send?text=<?php echo $title . ' ' . $url; ?>" target="_blank">
+                                                                <a class="dropdown-item" href="https://api.whatsapp.com/send?text=<?php echo $title . ' ' . $url; ?>" target="_blank" rel="noopener noreferrer">
                                                                     <i class="fa fa-whatsapp"></i> WhatsApp
                                                                 </a>
                                                                 <div class="dropdown-divider"></div>
@@ -1095,43 +1095,52 @@ $categories = getAllCategories();
 
     <script>
         $(document).ready(function() {
-            // Initialize Bootstrap dropdowns with specific options
-            $('.dropdown-toggle').dropdown({
-                display: 'static',
-                popperConfig: {
-                    placement: 'top-end'
+            // Initialize dropdowns
+            $('.dropdown-toggle').dropdown();
+
+            // Handle copy link functionality
+            $('.copy-link').on('click', function(e) {
+                e.preventDefault();
+                <?php if (!isLoggedIn()): ?>
+                    window.location.href = 'login.php?return_url=<?php echo $return_url; ?>';
+                <?php else: ?>
+                    var url = $(this).data('url');
+                    navigator.clipboard.writeText(url).then(function() {
+                        $('.copy-success').fadeIn().delay(2000).fadeOut();
+                    }).catch(function() {
+                        // Fallback for older browsers
+                        var $temp = $("<input>");
+                        $("body").append($temp);
+                        $temp.val(url).select();
+                        document.execCommand("copy");
+                        $temp.remove();
+                        $('.copy-success').fadeIn().delay(2000).fadeOut();
+                    });
+                <?php endif; ?>
+            });
+
+            // Handle share menu positioning
+            $('.post-share .nav-link').on('click', function(e) {
+                e.preventDefault();
+                var $dropdownMenu = $(this).siblings('.share-menu');
+                
+                if ($dropdownMenu.is(':visible')) {
+                    $dropdownMenu.hide();
+                    $('.dropdown-backdrop').remove();
+                } else {
+                    $dropdownMenu.show();
+                    if ($(window).width() <= 767) {
+                        $('<div class="dropdown-backdrop"></div>').insertAfter('.share-menu');
+                    }
                 }
             });
 
-            <?php if (!isLoggedIn()): ?>
-            // For non-logged in users, redirect share attempts to login
-            $('.share-link').on('click', function(e) {
-                e.preventDefault();
-                window.location.href = 'login.php?return_url=<?php echo $return_url; ?>';
-            });
-            <?php endif; ?>
-
-            // Handle copy link
-            $('.copy-link').click(function(e) {
-                <?php if (!isLoggedIn()): ?>
-                e.preventDefault();
-                window.location.href = 'login.php?return_url=<?php echo $return_url; ?>';
-                <?php else: ?>
-                e.preventDefault();
-                var url = $(this).data('url');
-                
-                // Create temporary input
-                var $temp = $("<input>");
-                $("body").append($temp);
-                $temp.val(url).select();
-                
-                // Copy to clipboard
-                document.execCommand("copy");
-                $temp.remove();
-                
-                // Show success message
-                $('.copy-success').fadeIn().delay(2000).fadeOut();
-                <?php endif; ?>
+            // Close dropdown when clicking outside
+            $(document).on('click', function(e) {
+                if (!$(e.target).closest('.post-share').length) {
+                    $('.share-menu').hide();
+                    $('.dropdown-backdrop').remove();
+                }
             });
 
             // Prevent dropdown from closing when clicking inside
@@ -1139,24 +1148,10 @@ $categories = getAllCategories();
                 e.stopPropagation();
             });
 
-            // Add backdrop for mobile devices
-            if ($(window).width() <= 767) {
-                $('.post-share .dropdown-toggle').on('shown.bs.dropdown', function () {
-                    $('<div class="dropdown-backdrop"></div>').insertAfter('.share-menu');
-                });
-
-                $('.post-share .dropdown-toggle').on('hidden.bs.dropdown', function () {
-                    $('.dropdown-backdrop').remove();
-                });
-            }
-
-            // Force dropdown position update on show
-            $('.post-share .dropdown-toggle').on('show.bs.dropdown', function () {
-                $(this).closest('.post-share').addClass('dropup');
-                $(this).next('.dropdown-menu').css({
-                    'display': 'block',
-                    'transform': 'translate3d(0px, 0px, 0px) !important'
-                });
+            // Close share menu when clicking backdrop on mobile
+            $(document).on('click', '.dropdown-backdrop', function() {
+                $('.share-menu').hide();
+                $('.dropdown-backdrop').remove();
             });
         });
 

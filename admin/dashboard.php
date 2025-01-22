@@ -8,273 +8,142 @@ if (!isLoggedIn() || !isAdmin()) {
     exit;
 }
 
-// Get search parameters
-$search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$search_by = isset($_GET['search_by']) ? $_GET['search_by'] : 'title';
-$status_filter = isset($_GET['status']) ? $_GET['status'] : '';
-$active_filter = isset($_GET['active']) ? $_GET['active'] : '';
-$show_deleted = isset($_GET['show_deleted']) ? $_GET['show_deleted'] : '0';
-$date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
-$date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
+// Get search parameters and sanitize them
+$search = isset($_GET['search']) ? trim(htmlspecialchars($_GET['search'])) : '';
+$search_by = isset($_GET['search_by']) && in_array($_GET['search_by'], ['title', 'author', 'category', 'tag']) ? $_GET['search_by'] : 'title';
+$status_filter = isset($_GET['status']) && in_array($_GET['status'], ['published', 'draft']) ? $_GET['status'] : '';
+$active_filter = isset($_GET['active']) && in_array($_GET['active'], ['0', '1']) ? $_GET['active'] : '';
+$sort_order = isset($_GET['sort_order']) && in_array($_GET['sort_order'], ['asc', 'desc']) ? $_GET['sort_order'] : 'desc';
 
-// Get current page number
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+// Get current page number and validate
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $posts_per_page = 10;
 $offset = ($page - 1) * $posts_per_page;
 
-// Get total number of posts (for pagination)
-$count_sql = "SELECT COUNT(DISTINCT p.id) as total FROM posts p 
+// Validate and format date inputs
+$date_from = isset($_GET['date_from']) && strtotime($_GET['date_from']) ? date('Y-m-d', strtotime($_GET['date_from'])) : '';
+$date_to = isset($_GET['date_to']) && strtotime($_GET['date_to']) ? date('Y-m-d', strtotime($_GET['date_to'])) : '';
+
+// Base SQL for counting and fetching posts
+$base_sql = "FROM posts p 
               LEFT JOIN categories c ON p.category_id = c.id 
               LEFT JOIN users u ON p.author_id = u.id 
               LEFT JOIN post_tags pt ON p.id = pt.post_id
               LEFT JOIN tags t ON pt.tag_id = t.id
-              WHERE " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL");
+             WHERE p.deleted_at IS NULL";
 
-// Add active/inactive filter
-if ($active_filter !== '') {
-    $count_sql .= " AND p.is_active = ?";
-}
-
-// Add search conditions to count query
-if (!empty($search)) {
-    switch ($search_by) {
-        case 'title':
-            $count_sql .= " AND p.title LIKE ?";
-            $search_param = "%$search%";
-            break;
-        case 'author':
-            $count_sql .= " AND u.username LIKE ?";
-            $search_param = "%$search%";
-            break;
-        case 'category':
-            $count_sql .= " AND c.name LIKE ?";
-            $search_param = "%$search%";
-            break;
-        case 'tag':
-            $count_sql .= " AND t.name LIKE ?";
-            $search_param = "%$search%";
-            break;
-    }
-}
-
-if (!empty($date_from) && !empty($date_to)) {
-    $count_sql .= " AND DATE(p.created_at) BETWEEN ? AND ?";
-}
-
-if (!empty($status_filter)) {
-    $count_sql .= " AND p.status = ?";
-}
-
-$count_stmt = $conn->prepare($count_sql);
-
-// Build parameter array and types string for count query
-$count_params = array();
-$count_types = "";
-
-if ($active_filter !== '') {
-    $count_params[] = $active_filter;
-    $count_types .= "i";
-}
-
-if (!empty($search)) {
-    $count_params[] = $search_param;
-    $count_types .= "s";
-}
-
-if (!empty($date_from) && !empty($date_to)) {
-    $count_params[] = $date_from;
-    $count_params[] = $date_to;
-    $count_types .= "ss";
-}
-
-if (!empty($status_filter)) {
-    $count_params[] = $status_filter;
-    $count_types .= "s";
-}
-
-// Bind parameters dynamically for count query
-if (!empty($count_params)) {
-    $count_stmt->bind_param($count_types, ...$count_params);
-}
-$count_stmt->execute();
-$total_posts = $count_stmt->get_result()->fetch_assoc()['total'];
-$total_pages = ceil($total_posts / $posts_per_page);
-
-// Ensure current page is within valid range
-$page = max(1, min($page, max(1, $total_pages)));
-
-// Modify the main query to include LIMIT and OFFSET
-$sql = "SELECT DISTINCT p.*, c.name as category_name, u.username as author_name,
-        GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
-        FROM posts p 
-        LEFT JOIN categories c ON p.category_id = c.id 
-        LEFT JOIN users u ON p.author_id = u.id 
-        LEFT JOIN post_tags pt ON p.id = pt.post_id
-        LEFT JOIN tags t ON pt.tag_id = t.id
-        WHERE " . ($show_deleted === '1' ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL");
-
-// Add active/inactive filter
-if ($active_filter !== '') {
-    $sql .= " AND p.is_active = ?";
-}
-
-// Add search conditions
-if (!empty($search)) {
-    switch ($search_by) {
-        case 'title':
-            $sql .= " AND p.title LIKE ?";
-            break;
-        case 'author':
-            $sql .= " AND u.username LIKE ?";
-            break;
-        case 'category':
-            $sql .= " AND c.name LIKE ?";
-            break;
-        case 'tag':
-            $sql .= " AND t.name LIKE ?";
-            break;
-    }
-}
-
-// Add date range filter
-if (!empty($date_from) && !empty($date_to)) {
-    $sql .= " AND DATE(p.created_at) BETWEEN ? AND ?";
-}
-
-// Add status filter
-if (!empty($status_filter)) {
-    $sql .= " AND p.status = ?";
-}
-
-$sql .= " GROUP BY p.id ORDER BY p.created_at DESC LIMIT ? OFFSET ?";
-
-// Prepare and execute the query
-$stmt = $conn->prepare($sql);
-
-// Build parameter array and types string for main query
-$params = array();
+// Initialize parameters array and types string
+$params = [];
 $types = "";
 
+// Build search conditions
 if ($active_filter !== '') {
+    $base_sql .= " AND p.is_active = ?";
     $params[] = $active_filter;
     $types .= "i";
 }
 
 if (!empty($search)) {
-    $params[] = $search_param;
+    switch ($search_by) {
+        case 'title':
+            $base_sql .= " AND p.title LIKE ?";
+            break;
+        case 'author':
+            $base_sql .= " AND u.username LIKE ?";
+            break;
+        case 'category':
+            $base_sql .= " AND c.name LIKE ?";
+            break;
+        case 'tag':
+            $base_sql .= " AND t.name LIKE ?";
+            break;
+    }
+    $params[] = "%$search%";
     $types .= "s";
 }
 
+// Add date conditions to SQL
+if (!empty($date_from) || !empty($date_to)) {
 if (!empty($date_from) && !empty($date_to)) {
-    $params[] = $date_from;
-    $params[] = $date_to;
-    $types .= "ss";
+        // Both dates provided
+        $base_sql .= " AND DATE(p.created_at) BETWEEN ? AND ?";
+        $params[] = $date_from;
+        $params[] = $date_to;
+        $types .= "ss";
+    } elseif (!empty($date_from)) {
+        // Only from date provided
+        $base_sql .= " AND DATE(p.created_at) >= ?";
+        $params[] = $date_from;
+        $types .= "s";
+    } elseif (!empty($date_to)) {
+        // Only to date provided
+        $base_sql .= " AND DATE(p.created_at) <= ?";
+        $params[] = $date_to;
+        $types .= "s";
+    }
 }
 
 if (!empty($status_filter)) {
+    $base_sql .= " AND p.status = ?";
     $params[] = $status_filter;
     $types .= "s";
 }
 
-// Add LIMIT and OFFSET parameters
+// Get total number of posts (for pagination)
+$count_sql = "SELECT COUNT(DISTINCT p.id) as total " . $base_sql;
+$count_stmt = $conn->prepare($count_sql);
+
+if (!empty($params)) {
+    $count_stmt->bind_param($types, ...$params);
+}
+
+$count_stmt->execute();
+$total_posts = $count_stmt->get_result()->fetch_assoc()['total'];
+$total_pages = max(1, ceil($total_posts / $posts_per_page));
+$count_stmt->close();
+
+// Ensure current page is within valid range
+$page = min($page, $total_pages);
+
+// Get posts with all details
+$sql = "SELECT DISTINCT p.*, 
+        c.name as category_name, 
+        u.username as author_name,
+        GROUP_CONCAT(DISTINCT t.name ORDER BY t.name ASC SEPARATOR ', ') as post_tags 
+        " . $base_sql . "
+        GROUP BY p.id 
+        ORDER BY p.created_at " . strtoupper($sort_order) . " 
+        LIMIT ? OFFSET ?";
+
+// Add pagination parameters
 $params[] = $posts_per_page;
 $params[] = $offset;
 $types .= "ii";
 
-// Bind parameters dynamically for main query
+$stmt = $conn->prepare($sql);
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
 }
 $stmt->execute();
 $posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 
-// For debugging pagination issues
-if (empty($posts) && $page > 1) {
-    error_log("Debug - Page: $page, Total Pages: $total_pages, Offset: $offset, Total Posts: $total_posts");
-    error_log("Debug - SQL: $sql");
-    error_log("Debug - Params: " . print_r($params, true));
-}
+// Optimize statistics queries by combining them
+$stats_sql = "SELECT 
+    (SELECT COUNT(*) FROM posts WHERE deleted_at IS NULL) as total_posts,
+    (SELECT COUNT(*) FROM posts WHERE status = 'published' AND is_active = 1 AND deleted_at IS NULL) as published_posts,
+    (SELECT COUNT(*) FROM posts WHERE status = 'draft' AND deleted_at IS NULL) as draft_posts,
+    (SELECT COUNT(*) FROM posts WHERE featured = 1 AND is_active = 1 AND deleted_at IS NULL) as featured_posts,
+    (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND is_active = 1) as total_users,
+    (SELECT COUNT(*) FROM users WHERE role = 'admin' AND deleted_at IS NULL AND is_active = 1) as admin_users,
+    (SELECT COUNT(*) FROM users WHERE role = 'author' AND deleted_at IS NULL AND is_active = 1) as author_users,
+    (SELECT COUNT(*) FROM users WHERE role = 'user' AND deleted_at IS NULL AND is_active = 1) as normal_users,
+    (SELECT COUNT(*) FROM categories WHERE deleted_at IS NULL AND is_active = 1) as total_categories,
+    (SELECT COUNT(*) FROM tags WHERE deleted_at IS NULL AND is_active = 1) as total_tags,
+    (SELECT COUNT(*) FROM netpy_newsletter_users WHERE deleted_at IS NULL AND is_active = 1) as total_subscribers";
 
-// Get post statistics
-$stats_stmt = $conn->prepare("SELECT 
-            COUNT(*) as total_posts,
-            SUM(CASE WHEN status = 'published' AND is_active = 1 THEN 1 ELSE 0 END) as published_posts,
-            SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_posts,
-            SUM(CASE WHEN featured = 1 AND is_active = 1 THEN 1 ELSE 0 END) as featured_posts
-        FROM posts 
-        WHERE deleted_at IS NULL");
-$stats_stmt->execute();
-$stats = $stats_stmt->get_result()->fetch_assoc();
-$stats_stmt->close();
-
-// Get user statistics
-$user_stats_stmt = $conn->prepare("SELECT 
-            COUNT(*) as total_users,
-            SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) as admin_users,
-            SUM(CASE WHEN role = 'author' THEN 1 ELSE 0 END) as author_users,
-            SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) as normal_users
-        FROM users 
-        WHERE deleted_at IS NULL 
-        AND is_active = 1");
-$user_stats_stmt->execute();
-$user_stats = $user_stats_stmt->get_result()->fetch_assoc();
-$user_stats_stmt->close();
-
-// Get total posts count
-$posts_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL");
-$posts_count_stmt->execute();
-$total_posts = $posts_count_stmt->get_result()->fetch_assoc()['total'];
-$posts_count_stmt->close();
-
-// Get published posts count
-$published_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM posts 
-                       WHERE status = 'published' 
-                       AND deleted_at IS NULL 
-                       AND is_active = 1");
-$published_count_stmt->execute();
-$published_posts = $published_count_stmt->get_result()->fetch_assoc()['total'];
-$published_count_stmt->close();
-
-// Get draft posts count
-$draft_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM posts 
-                    WHERE status = 'draft' 
-                    AND deleted_at IS NULL");
-$draft_count_stmt->execute();
-$draft_posts = $draft_count_stmt->get_result()->fetch_assoc()['total'];
-$draft_count_stmt->close();
-
-// Get total users count
-$users_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM users 
-                    WHERE deleted_at IS NULL 
-                    AND is_active = 1");
-$users_count_stmt->execute();
-$total_users = $users_count_stmt->get_result()->fetch_assoc()['total'];
-$users_count_stmt->close();
-
-// Get total categories count
-$categories_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM categories 
-                        WHERE deleted_at IS NULL 
-                        AND is_active = 1");
-$categories_count_stmt->execute();
-$total_categories = $categories_count_stmt->get_result()->fetch_assoc()['total'];
-$categories_count_stmt->close();
-
-// Get total tags count
-$tags_count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM tags 
-                   WHERE deleted_at IS NULL 
-                   AND is_active = 1");
-$tags_count_stmt->execute();
-$total_tags = $tags_count_stmt->get_result()->fetch_assoc()['total'];
-$tags_count_stmt->close();
-
-// Get total newsletter subscribers count
-$subscribers_count_stmt = $conn->prepare("SELECT COUNT(*) as total 
-                                        FROM netpy_newsletter_users 
-                                        WHERE deleted_at IS NULL 
-                                        AND is_active = 1");
-$subscribers_count_stmt->execute();
-$total_subscribers = $subscribers_count_stmt->get_result()->fetch_assoc()['total'];
-$subscribers_count_stmt->close();
+$stats_result = $conn->query($stats_sql);
+$stats = $stats_result->fetch_assoc();
 
 // Get recent posts
 $recent_posts_stmt = $conn->prepare("SELECT p.*, c.name as category_name, u.username as author_name,
@@ -359,6 +228,42 @@ include '../includes/header.php';
             margin-bottom: 15px;
             color: #f48840;
         }
+        .input-group.has-filter .form-control {
+            border-color: #17a2b8;
+        }
+        .active-filters {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .active-filters .badge {
+            font-size: 90%;
+            padding: 5px 10px;
+        }
+        .clear-filter {
+            height: 38px;
+            line-height: 24px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        .d-flex .input-group {
+            flex: 1;
+        }
+        .input-group-append .btn {
+            z-index: 0;
+        }
+        .filter-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        .filter-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
     </style>
 </head>
 
@@ -392,7 +297,7 @@ include '../includes/header.php';
                         <a href="manage-users.php" class="btn btn-info">Manage Users</a>
                         <a href="manage-categories.php" class="btn btn-success">Manage Categories</a>
                         <a href="manage-tags.php" class="btn btn-secondary">Manage Tags</a>
-                        <a href="manage-newsletter.php" class="btn btn-warning">Manage Newsletter</a>
+                        <a href="manage-newsletter.php" class="btn btn-warning">Manage Subscribers</a>
                         <a href="settings.php" class="btn btn-dark">Settings</a>
                     </div>
 
@@ -425,18 +330,18 @@ include '../includes/header.php';
                         <div class="col-md-3">
                             <div class="stats-box">
                                 <h3>Total Users</h3>
-                                <p class="h4"><?php echo $user_stats['total_users']; ?></p>
+                                <p class="h4"><?php echo $stats['total_users']; ?></p>
                                 <small>
-                                    Admins: <?php echo $user_stats['admin_users']; ?> |
-                                    Authors: <?php echo $user_stats['author_users']; ?> |
-                                    Users: <?php echo $user_stats['normal_users']; ?>
+                                    Admins: <?php echo $stats['admin_users']; ?> |
+                                    Authors: <?php echo $stats['author_users']; ?> |
+                                    Users: <?php echo $stats['normal_users']; ?>
                                 </small>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="stats-box">
                                 <h3>Newsletter</h3>
-                                <p>Total Subscribers: <?php echo $total_subscribers; ?></p>
+                                <p>Total Subscribers: <?php echo $stats['total_subscribers']; ?></p>
                             </div>
                         </div>
                     </div>
@@ -470,63 +375,153 @@ include '../includes/header.php';
                             <div class="col-lg-12">
                                 <div class="sidebar-item recent-posts">
                                     <div class="sidebar-heading">
-                                        <h2>Recent Posts</h2>
+                                        <h2>Posts</h2>
                                     </div>
                                     <!-- Search Form -->
                                     <div class="mb-4">
-                                        <form method="GET" class="form">
+                                        <form method="GET" class="form" id="searchForm">
                                             <div class="row">
                                                 <div class="col-md-3 mb-2">
-                                                    <input type="text" name="search" class="form-control" placeholder="Search..." value="<?php echo htmlspecialchars($search); ?>">
+                                                    <label for="search">Search</label>
+                                                    <div class="d-flex">
+                                                        <div class="input-group">
+                                                            <input type="text" id="search" name="search" class="form-control" placeholder="Enter search term..." value="<?php echo htmlspecialchars($search); ?>">
+                                                        </div>
+                                                        <?php if (!empty($search)): ?>
+                                                            <button type="button" class="btn btn-outline-secondary ml-2 clear-filter" data-clear="search">
+                                                                Clear
+                                                            </button>
+                                                        <?php endif; ?>
+                                                    </div>
                                                 </div>
                                                 <div class="col-md-2 mb-2">
-                                                    <select name="search_by" class="form-control">
-                                                        <option value="title" <?php echo $search_by === 'title' ? 'selected' : ''; ?>>Title</option>
-                                                        <option value="author" <?php echo $search_by === 'author' ? 'selected' : ''; ?>>Author</option>
-                                                        <option value="category" <?php echo $search_by === 'category' ? 'selected' : ''; ?>>Category</option>
-                                                        <option value="tag" <?php echo $search_by === 'tag' ? 'selected' : ''; ?>>Tag</option>
-                                                    </select>
+                                                    <label for="search_by">Search By</label>
+                                                    <div class="d-flex">
+                                                        <div class="input-group">
+                                                            <select name="search_by" id="search_by" class="form-control">
+                                                                <option value="title" <?php echo $search_by === 'title' ? 'selected' : ''; ?>>Title</option>
+                                                                <option value="author" <?php echo $search_by === 'author' ? 'selected' : ''; ?>>Author</option>
+                                                                <option value="category" <?php echo $search_by === 'category' ? 'selected' : ''; ?>>Category</option>
+                                                                <option value="tag" <?php echo $search_by === 'tag' ? 'selected' : ''; ?>>Tag</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div class="col-md-2 mb-2">
-                                                    <select name="status" class="form-control">
-                                                        <option value="">All Status</option>
-                                                        <option value="published" <?php echo $status_filter === 'published' ? 'selected' : ''; ?>>Published</option>
-                                                        <option value="draft" <?php echo $status_filter === 'draft' ? 'selected' : ''; ?>>Draft</option>
-                                                    </select>
+                                                    <label for="status">Status</label>
+                                                    <div class="d-flex">
+                                                        <div class="input-group">
+                                                            <select name="status" id="status" class="form-control">
+                                                                <option value="">All Status</option>
+                                                                <option value="published" <?php echo $status_filter === 'published' ? 'selected' : ''; ?>>Published</option>
+                                                                <option value="draft" <?php echo $status_filter === 'draft' ? 'selected' : ''; ?>>Draft</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div class="col-md-2 mb-2">
-                                                    <select name="active" class="form-control">
-                                                        <option value="">All Posts</option>
-                                                        <option value="1" <?php echo $active_filter === '1' ? 'selected' : ''; ?>>Active</option>
-                                                        <option value="0" <?php echo $active_filter === '0' ? 'selected' : ''; ?>>Inactive</option>
-                                                    </select>
+                                                    <label for="active">Active Status</label>
+                                                    <div class="d-flex">
+                                                        <div class="input-group">
+                                                            <select name="active" id="active" class="form-control">
+                                                                <option value="">All Posts</option>
+                                                                <option value="1" <?php echo $active_filter === '1' ? 'selected' : ''; ?>>Active</option>
+                                                                <option value="0" <?php echo $active_filter === '0' ? 'selected' : ''; ?>>Inactive</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div class="col-md-3 mb-2">
-                                                    <select name="show_deleted" class="form-control">
-                                                        <option value="0" <?php echo $show_deleted === '0' ? 'selected' : ''; ?>>Active Posts</option>
-                                                        <option value="1" <?php echo $show_deleted === '1' ? 'selected' : ''; ?>>Deleted Posts</option>
-                                                    </select>
+                                                <div class="col-md-2 mb-2">
+                                                    <label for="sort_order">Sort Order</label>
+                                                    <div class="d-flex">
+                                                        <div class="input-group">
+                                                            <select name="sort_order" id="sort_order" class="form-control">
+                                                                <option value="desc" <?php echo $sort_order === 'desc' ? 'selected' : ''; ?>>Newest First</option>
+                                                                <option value="asc" <?php echo $sort_order === 'asc' ? 'selected' : ''; ?>>Oldest First</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-1 mb-2">
+                                                    <label>&nbsp;</label>
+                                                    <button type="submit" class="btn btn-primary w-100">
+                                                        <i class="fa fa-search"></i>
+                                                    </button>
                                                 </div>
                                             </div>
                                             <div class="row mt-2">
                                                 <div class="col-md-3 mb-2">
-                                                    <input type="date" name="date_from" class="form-control" placeholder="From Date" value="<?php echo htmlspecialchars($date_from); ?>">
+                                                    <label for="date_from">From Date</label>
+                                                    <div class="d-flex">
+                                                        <div class="input-group">
+                                                            <input type="date" id="date_from" name="date_from" class="form-control" value="<?php echo htmlspecialchars($date_from); ?>" max="<?php echo date('Y-m-d'); ?>">
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div class="col-md-3 mb-2">
-                                                    <input type="date" name="date_to" class="form-control" placeholder="To Date" value="<?php echo htmlspecialchars($date_to); ?>">
+                                                    <label for="date_to">To Date</label>
+                                                    <div class="d-flex">
+                                                        <div class="input-group">
+                                                            <input type="date" id="date_to" name="date_to" class="form-control" value="<?php echo htmlspecialchars($date_to); ?>" max="<?php echo date('Y-m-d'); ?>">
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div class="col-md-6 mb-2">
-                                                    <button type="submit" class="btn btn-primary">Search</button>
-                                                    <?php if (!empty($search) || !empty($status_filter) || !empty($date_from) || !empty($date_to) || !empty($active_filter) || $show_deleted === '1'): ?>
-                                                        <a href="dashboard.php" class="btn btn-secondary">Clear</a>
-                                                    <?php endif; ?>
+                                                    <label>&nbsp;</label>
+                                                    <div>
+                                                        <?php if (!empty($search) || !empty($status_filter) || !empty($date_from) || !empty($date_to) || !empty($active_filter) || $sort_order !== 'desc'): ?>
+                                                            <a href="dashboard.php" class="btn btn-secondary">
+                                                                <i class="fa fa-times"></i> Clear All Filters
+                                                            </a>
+                                                        <?php endif; ?>
+                                                        <span class="ml-2">
+                                                            Found <?php echo $total_posts; ?> post<?php echo $total_posts !== 1 ? 's' : ''; ?>
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
+
+                                            <?php if (!empty($search) || !empty($status_filter) || !empty($date_from) || !empty($date_to) || !empty($active_filter) || $sort_order !== 'desc'): ?>
+                                            <div class="row mt-2">
+                                                <div class="col-12">
+                                                    <div class="active-filters">
+                                                        <small class="text-muted">Active Filters:</small>
+                                                        <?php if (!empty($search)): ?>
+                                                            <span class="badge badge-info mr-2">Search: <?php echo htmlspecialchars($search); ?> (<?php echo ucfirst($search_by); ?>)</span>
+                                                        <?php endif; ?>
+                                                        <?php if (!empty($status_filter)): ?>
+                                                            <span class="badge badge-info mr-2">Status: <?php echo ucfirst($status_filter); ?></span>
+                                                        <?php endif; ?>
+                                                        <?php if (!empty($active_filter)): ?>
+                                                            <span class="badge badge-info mr-2">Active Status: <?php echo $active_filter === '1' ? 'Active' : 'Inactive'; ?></span>
+                                                        <?php endif; ?>
+                                                        <?php if (!empty($date_from) || !empty($date_to)): ?>
+                                                            <span class="badge badge-info mr-2">Date Range: <?php 
+                                                                if (!empty($date_from) && !empty($date_to)) {
+                                                                    echo date('M j, Y', strtotime($date_from)) . ' to ' . date('M j, Y', strtotime($date_to));
+                                                                } elseif (!empty($date_from)) {
+                                                                    echo 'From ' . date('M j, Y', strtotime($date_from));
+                                                                } else {
+                                                                    echo 'Until ' . date('M j, Y', strtotime($date_to));
+                                                                }
+                                                            ?></span>
+                                                        <?php endif; ?>
+                                                        <span class="badge badge-info mr-2">Sort: <?php echo $sort_order === 'desc' ? 'Newest First' : 'Oldest First'; ?></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <?php endif; ?>
                                         </form>
                                     </div>
                                     <div class="content">
-                                        <table class="table">
-                                            <thead>
+                                        <?php if (empty($posts)): ?>
+                                            <div class="alert alert-info">
+                                                No posts found matching your criteria.
+                                            </div>
+                                        <?php else: ?>
+                                        <div class="table-responsive">
+                                            <table class="table table-hover">
+                                                <thead class="thead-light">
                                                 <tr>
                                                     <th>Title</th>
                                                     <th>Author</th>
@@ -571,28 +566,25 @@ include '../includes/header.php';
                                                     </td>
                                                     <td><?php echo date('M j, Y', strtotime($post['created_at'])); ?></td>
                                                     <td>
-                                                        <?php if ($show_deleted === '0'): ?>
-                                                            <form method="POST" action="delete-post.php" style="display: inline;">
-                                                                <input type="hidden" name="post_id" value="<?php echo $post['id']; ?>">
-                                                                <input type="hidden" name="new_status" value="<?php echo $post['is_active'] ? '0' : '1'; ?>">
-                                                                <a href="edit-post.php?id=<?php echo $post['id']; ?>" class="btn btn-primary btn-sm">
-                                                                    Edit
+                                                            <div class="btn-group btn-group-sm">
+                                                                <a href="edit-post.php?id=<?php echo $post['id']; ?>" class="btn btn-primary">
+                                                                    <i class="fa fa-edit"></i> Edit
                                                                 </a>
-                                                                <button type="submit" name="toggle_status" class="btn btn-<?php echo $post['is_active'] ? 'warning' : 'success'; ?> btn-sm">
-                                                                    <?php echo $post['is_active'] ? 'Deactivate' : 'Activate'; ?>
-                                                                </button>
-                                                                <button type="submit" name="delete_post" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this post?');">
-                                                                    Delete
-                                                                </button>
-                                                            </form>
-                                                        <?php else: ?>
-                                                            <span class="badge badge-danger">Deleted</span>
-                                                        <?php endif; ?>
+                                                                <form method="POST" action="delete-post.php" style="display: inline;">
+                                                                    <input type="hidden" name="post_id" value="<?php echo $post['id']; ?>">
+                                                                    <input type="hidden" name="new_status" value="<?php echo $post['is_active'] ? '0' : '1'; ?>">
+                                                                    <button type="submit" class="btn btn-<?php echo $post['is_active'] ? 'warning' : 'success'; ?>">
+                                                                        <?php echo $post['is_active'] ? 'Deactivate' : 'Activate'; ?>
+                                                                    </button>
+                                                                </form>
+                                                            </div>
                                                     </td>
                                                 </tr>
                                                 <?php endforeach; ?>
                                             </tbody>
                                         </table>
+                                        </div>
+                                        <?php endif; ?>
                                         
                                         <!-- Pagination -->
                                         <?php if ($total_pages > 1): ?>
@@ -606,9 +598,9 @@ include '../includes/header.php';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
                                                                 echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
-                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
+                                                                echo '&sort_order='.urlencode($sort_order);
                                                             ?>" aria-label="First">
                                                                 <span aria-hidden="true">&laquo;&laquo;</span>
                                                             </a>
@@ -619,9 +611,9 @@ include '../includes/header.php';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
                                                                 echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
-                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
+                                                                echo '&sort_order='.urlencode($sort_order);
                                                             ?>" aria-label="Previous">
                                                                 <span aria-hidden="true">&laquo;</span>
                                                             </a>
@@ -640,9 +632,9 @@ include '../includes/header.php';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
                                                                 echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
-                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
+                                                                echo '&sort_order='.urlencode($sort_order);
                                                             ?>"><?php echo $i; ?></a>
                                                         </li>
                                                     <?php endfor; ?>
@@ -654,9 +646,9 @@ include '../includes/header.php';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
                                                                 echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
-                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
+                                                                echo '&sort_order='.urlencode($sort_order);
                                                             ?>" aria-label="Next">
                                                                 <span aria-hidden="true">&raquo;</span>
                                                             </a>
@@ -667,9 +659,9 @@ include '../includes/header.php';
                                                                 echo !empty($search_by) ? '&search_by='.urlencode($search_by) : '';
                                                                 echo !empty($status_filter) ? '&status='.urlencode($status_filter) : '';
                                                                 echo !empty($active_filter) ? '&active='.urlencode($active_filter) : '';
-                                                                echo $show_deleted === '1' ? '&show_deleted=1' : '';
                                                                 echo !empty($date_from) ? '&date_from='.urlencode($date_from) : '';
                                                                 echo !empty($date_to) ? '&date_to='.urlencode($date_to) : '';
+                                                                echo '&sort_order='.urlencode($sort_order);
                                                             ?>" aria-label="Last">
                                                                 <span aria-hidden="true">&raquo;&raquo;</span>
                                                             </a>
@@ -700,5 +692,130 @@ include '../includes/header.php';
     <script src="../assets/js/slick.js"></script>
     <script src="../assets/js/isotope.js"></script>
     <script src="../assets/js/accordions.js"></script>
+    
+    <script>
+    $(document).ready(function() {
+        // Set max date for date inputs to today
+        var today = new Date().toISOString().split('T')[0];
+        $('#date_from, #date_to').attr('max', today);
+        
+        // Handle date input changes
+        $('#date_from').on('change', function() {
+            var fromDate = $(this).val();
+            var toDate = $('#date_to').val();
+            
+            if (fromDate && toDate && fromDate > toDate) {
+                $('#date_to').val(fromDate);
+            }
+            
+            $(this).closest('form').submit();
+        });
+        
+        $('#date_to').on('change', function() {
+            var fromDate = $('#date_from').val();
+            var toDate = $(this).val();
+            
+            if (fromDate && toDate && fromDate > toDate) {
+                $('#date_from').val(toDate);
+            }
+            
+            $(this).closest('form').submit();
+        });
+        
+        // Auto-submit form when certain filters change
+        $('#active').on('change', function() {
+            $(this).closest('form').submit();
+        });
+        
+        // Handle clear filter buttons
+        $('.clear-filter').on('click', function(e) {
+            e.preventDefault();
+            var filterToClear = $(this).data('clear');
+            var $form = $('#searchForm');
+            
+            // Special handling for related filters
+            switch(filterToClear) {
+                case 'search':
+                    // Clear both search and search_by
+                    $form.find('[name="search"]').val('');
+                    $form.find('[name="search_by"]').val('title');
+                    break;
+                case 'search_by':
+                    // Reset search_by to default (title)
+                    $form.find('[name="search_by"]').val('title');
+                    break;
+                case 'date_from':
+                    // Clear from date
+                    $form.find('[name="date_from"]').val('');
+                    break;
+                case 'date_to':
+                    // Clear to date
+                    $form.find('[name="date_to"]').val('');
+                    break;
+                default:
+                    // Clear the specific filter
+                    $form.find('[name="' + filterToClear + '"]').val('');
+            }
+            
+            // Submit the form
+            $form.submit();
+        });
+        
+        // Handle post status toggle
+        $('button[name="toggle_status"]').on('click', function(e) {
+            e.preventDefault();
+            var $button = $(this);
+            var $form = $button.closest('form');
+            var action = $button.text().trim().toLowerCase();
+            var title = $button.closest('tr').find('td:first').text().trim();
+            
+            if (confirm('Are you sure you want to ' + action + ' the post "' + title + '"?')) {
+                // Show loading state
+                $button.prop('disabled', true);
+                $button.html('<i class="fa fa-spinner fa-spin"></i> Processing...');
+                
+                // Submit the form using AJAX
+                $.ajax({
+                    url: $form.attr('action'),
+                    type: 'POST',
+                    data: $form.serialize(),
+                    success: function(response) {
+                        // Reload the page to show updated status
+                        window.location.reload();
+                    },
+                    error: function() {
+                        alert('Error updating post status. Please try again.');
+                        $button.prop('disabled', false);
+                        $button.html('<i class="fa fa-' + ($button.hasClass('btn-warning') ? 'times' : 'check') + '"></i> ' + 
+                                   ($button.hasClass('btn-warning') ? 'Deactivate' : 'Activate'));
+                    }
+                });
+            }
+        });
+        
+        // Add confirmation for activate/deactivate
+        $('form[action="delete-post.php"]').on('submit', function(e) {
+            e.preventDefault();
+            var $form = $(this);
+            var action = $form.find('button').text().trim().toLowerCase();
+            var title = $form.closest('tr').find('td:first').text().trim();
+            
+            if (confirm('Are you sure you want to ' + action + ' the post "' + title + '"?')) {
+                $form.off('submit').submit();
+            }
+        });
+        
+        // Show success/error messages if they exist
+        <?php if (isset($_SESSION['success_msg'])): ?>
+            alert('<?php echo addslashes($_SESSION['success_msg']); ?>');
+            <?php unset($_SESSION['success_msg']); ?>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error_msg'])): ?>
+            alert('<?php echo addslashes($_SESSION['error_msg']); ?>');
+            <?php unset($_SESSION['error_msg']); ?>
+        <?php endif; ?>
+    });
+    </script>
 </body>
 </html> 

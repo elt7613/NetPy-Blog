@@ -16,11 +16,12 @@ if (!$post_id) {
 }
 
 // Get post details
-$sql = "SELECT * FROM posts WHERE id = ? AND author_id = ?";
+$sql = "SELECT * FROM posts WHERE id = ?";
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("ii", $post_id, $_SESSION['user_id']);
+$stmt->bind_param('i', $post_id);
 $stmt->execute();
 $post = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 if (!$post) {
     header('Location: dashboard.php');

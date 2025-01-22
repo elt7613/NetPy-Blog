@@ -5,29 +5,60 @@ document.addEventListener('DOMContentLoaded', function() {
     const prevBtn = document.querySelector('.section-1 .prev');
     const nextBtn = document.querySelector('.section-1 .next');
 
-    let currentSlide = 0;
+    if (slides.length < 2) return; // Don't setup slider if there's only one slide
+
+    // Clone first and last slides
+    const firstSlideClone = slides[0].cloneNode(true);
+    const lastSlideClone = slides[slides.length - 1].cloneNode(true);
+    sliderContainer.appendChild(firstSlideClone);
+    sliderContainer.insertBefore(lastSlideClone, slides[0]);
+
+    let currentSlide = 1; // Start from first real slide (after clone)
+    let isTransitioning = false;
     let autoSlideInterval;
     const autoSlideDelay = 5000; // 5 seconds
 
+    // Initial positioning
+    sliderContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
+
     // Function to update slider position
-    function updateSlider() {
+    function updateSlider(transition = true) {
+        isTransitioning = transition;
+        sliderContainer.style.transition = transition ? 'transform 0.5s ease-in-out' : 'none';
         sliderContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
         
-        // Update active dot
+        // Update active dot (adjust for cloned slides)
+        const actualSlide = currentSlide - 1;
         dots.forEach((dot, index) => {
-            dot.classList.toggle('active', index === currentSlide);
+            dot.classList.toggle('active', index === (actualSlide % slides.length));
         });
+    }
+
+    // Function to handle infinite loop transition
+    function handleTransitionEnd() {
+        if (!isTransitioning) return;
+        
+        sliderContainer.style.transition = 'none';
+        if (currentSlide === 0) {
+            currentSlide = slides.length;
+        } else if (currentSlide === slides.length + 1) {
+            currentSlide = 1;
+        }
+        sliderContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
+        isTransitioning = false;
     }
 
     // Function to go to next slide
     function nextSlide() {
-        currentSlide = (currentSlide + 1) % slides.length;
+        if (isTransitioning) return;
+        currentSlide++;
         updateSlider();
     }
 
     // Function to go to previous slide
     function prevSlide() {
-        currentSlide = (currentSlide - 1 + slides.length) % slides.length;
+        if (isTransitioning) return;
+        currentSlide--;
         updateSlider();
     }
 
@@ -56,12 +87,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     dots.forEach((dot, index) => {
         dot.addEventListener('click', () => {
+            if (isTransitioning) return;
             stopAutoSlide();
-            currentSlide = index;
+            currentSlide = index + 1;
             updateSlider();
             startAutoSlide();
         });
     });
+
+    // Add transition end listener
+    sliderContainer.addEventListener('transitionend', handleTransitionEnd);
 
     // Touch events for mobile swipe
     let touchStartX = 0;

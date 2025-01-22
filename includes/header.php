@@ -16,6 +16,10 @@ if (isLoggedIn()) {
     $avatar_result = $stmt->get_result();
     if ($avatar_row = $avatar_result->fetch_assoc()) {
         $user_avatar = $avatar_row['avatar'];
+        // Add base URL to avatar path if it's not empty
+        if (!empty($user_avatar)) {
+            $user_avatar = $base_url . $user_avatar;
+        }
     }
 }
 
@@ -228,11 +232,10 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
             color: #0047cc;
         }
 
-        /* Show profile dropdown menu on hover for desktop */
-        @media (min-width: 992px) {
-            .profile-dropdown:hover .profile-dropdown-menu {
-                display: block;
-            }
+        /* Show profile dropdown menu on hover and click */
+        .profile-dropdown:hover .profile-dropdown-menu,
+        .profile-dropdown.show .profile-dropdown-menu {
+            display: block;
         }
     </style>
 </head>
@@ -248,7 +251,8 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
         <nav class="navbar navbar-expand-lg">
             <div class="container">
                 <a class="navbar-brand" href="<?php echo $base_url; ?>index.php">
-                    <h2>NetPy Blog<em>.</em></h2>
+                    <!-- <h2>NetPy Blog<em>.</em></h2> -->
+                     <img src="../assets/logo.png" alt="NetPy Blog" style="width: 100px; height: auto;">
                 </a>
                 <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive">
                     <span class="navbar-toggler-icon"></span>
@@ -284,7 +288,7 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                                         <?php if (!empty($user_avatar)): ?>
                                             <img src="<?php echo $user_avatar; ?>" alt="Profile" class="profile-img">
                                         <?php else: ?>
-                                            <img src="<?php echo $base_url; ?>assets/images/default-profile.png" alt="Default profile" class="profile-img">
+                                            <img src="<?php echo $base_url; ?>assets/images/default-avatar.png" alt="Profile" class="profile-img">
                                         <?php endif; ?>
                                     </a>
                                     <div class="profile-dropdown-menu">
@@ -356,7 +360,7 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                                         <?php if (!empty($user_avatar)): ?>
                                             <img src="<?php echo $user_avatar; ?>" alt="Profile" class="profile-img">
                                         <?php else: ?>
-                                            <img src="<?php echo $base_url; ?>assets/images/default-profile.png" alt="Default profile" class="profile-img">
+                                            <img src="<?php echo $base_url; ?>assets/images/default-avatar.png" alt="Profile" class="profile-img">
                                         <?php endif; ?>
                                     </a>
                                     <div class="profile-dropdown-menu">
@@ -404,7 +408,7 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                                         <?php if (!empty($user_avatar)): ?>
                                             <img src="<?php echo $user_avatar; ?>" alt="Profile" class="profile-img">
                                         <?php else: ?>
-                                            <img src="<?php echo $base_url; ?>assets/images/default-profile.png" alt="Default profile" class="profile-img">
+                                            <img src="<?php echo $base_url; ?>assets/images/default-avatar.png" alt="Profile" class="profile-img">
                                         <?php endif; ?>
                                     </a>
                                     <div class="profile-dropdown-menu">
@@ -507,23 +511,21 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                 });
             }
 
-            // Handle profile dropdown for both mobile and desktop
-            $('#profileDropdown').on('click', function(e) {
+            // Toggle profile dropdown on click
+            $('.profile-dropdown .nav-link').on('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                var $menu = $(this).siblings('.profile-dropdown-menu');
-                $('.profile-dropdown-menu').not($menu).hide();
-                $menu.toggle();
+                $(this).parent('.profile-dropdown').toggleClass('show');
             });
 
-            // Close profile dropdown when clicking outside
+            // Close dropdown when clicking outside
             $(document).on('click', function(e) {
                 if (!$(e.target).closest('.profile-dropdown').length) {
-                    $('.profile-dropdown-menu').hide();
+                    $('.profile-dropdown').removeClass('show');
                 }
             });
 
-            // Prevent dropdown clicks from closing the main menu
+            // Prevent dropdown from closing when clicking inside
             $('.profile-dropdown-menu').on('click', function(e) {
                 e.stopPropagation();
             });

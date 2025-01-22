@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-                $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+                $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif','webp','avif','svg','ico'];
                 
                 if (!in_array($file_extension, $allowed_extensions)) {
                     throw new Exception("Invalid file type. Allowed types: " . implode(', ', $allowed_extensions));

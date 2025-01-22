@@ -45,7 +45,7 @@ $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) :
                 </div>
             </div>
             
-            <!-- <div class="col-lg-12">
+            <div class="col-lg-12">
                 <div class="sidebar-item recent-posts">
                     <div class="sidebar-heading">
                         <h2>Recent Posts</h2>
@@ -63,9 +63,9 @@ $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) :
                         </ul>
                     </div>
                 </div>
-            </div> -->
+            </div>
             
-            <div class="col-lg-12">
+            <!-- <div class="col-lg-12">
                 <div class="sidebar-item categories">
                     <div class="sidebar-heading">
                         <h2>Categories</h2>
@@ -82,7 +82,7 @@ $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) :
                         </ul>
                     </div>
                 </div>
-            </div>
+            </div> -->
             
             <div class="col-lg-12">
                 <div class="sidebar-item tags">
