@@ -9,10 +9,10 @@ define('TINYMCE_API_KEY', 'nz9stqlza3ji0i4oj5u6g3nbbvsizqxd2wrwyv5cn120k2y3');
 define('SITE_URL', 'https://' . $_SERVER['HTTP_HOST']);
 
 try {
-    $servername = 'localhost'; //"127.0.0.1"; //'localhost';
-    $username = "u599418396_netpy_blog"; //"elt"; //"u599418396_netpy_blog";
-    $password = "NetPyTechBlog@123"; //"Password"; //"NetPyTechBlog@123";
-    $dbname = "u599418396_netpy_blog"; //"netpy_blog"; //"u599418396_netpy_blog";
+    $servername = "127.0.0.1"; //'localhost';
+    $username = "elt"; //"u599418396_netpy_blog";
+    $password = "Password"; //"NetPyTechBlog@123";
+    $dbname = "netpy_blog"; //"u599418396_netpy_blog";
 
     // Create connection
     $conn = mysqli_connect($servername, $username, $password, $dbname);

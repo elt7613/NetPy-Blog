@@ -1,20 +1,19 @@
 <?php
-// Get tags for footer - Limited to 10
-$footer_tags_sql = "SELECT t.*, COUNT(DISTINCT pt.post_id) as post_count 
-             FROM tags t 
-             LEFT JOIN post_tags pt ON t.id = pt.tag_id 
-             LEFT JOIN posts p ON pt.post_id = p.id 
-             AND p.status = 'published' 
-             AND p.deleted_at IS NULL 
-             AND p.is_active = 1
-             WHERE t.deleted_at IS NULL 
-             AND t.is_active = 1
-             GROUP BY t.id 
-             HAVING post_count > 0 
-             ORDER BY post_count DESC, t.name
-             LIMIT 10";
-$footer_tags_result = $conn->query($footer_tags_sql);
-$footer_tags = $footer_tags_result ? $footer_tags_result->fetch_all(MYSQLI_ASSOC) : [];
+// Get categories for footer - Limited to 10
+$footer_categories_sql = "SELECT c.*, COUNT(p.id) as post_count 
+                  FROM categories c 
+                  LEFT JOIN posts p ON c.id = p.category_id 
+                  AND p.status = 'published' 
+                  AND p.deleted_at IS NULL 
+                  AND p.is_active = 1
+                  WHERE c.deleted_at IS NULL 
+                  AND c.is_active = 1
+                  GROUP BY c.id 
+                  HAVING post_count > 0
+                  ORDER BY c.name
+                  LIMIT 10";
+$footer_categories_result = $conn->query($footer_categories_sql);
+$footer_categories = $footer_categories_result ? $footer_categories_result->fetch_all(MYSQLI_ASSOC) : [];
 
 // Determine settings link based on user role
 $settings_link = 'login.php';
@@ -55,17 +54,17 @@ if (isset($_SESSION['user_id'])) {
                 </div>
             </div>
             
-            <!-- Tags Column -->
+            <!-- Categories Column -->
             <div class="col-lg-4 col-md-6">
                 <div class="footer-section">
-                    <h4>Popular Tags</h4>
-                    <ul class="footer-tags">
-                        <?php foreach ($footer_tags as $tag): ?>
-                            <li><a href="tag.php?slug=<?php echo urlencode($tag['slug']); ?>"><?php echo htmlspecialchars($tag['name']); ?></a></li>
+                    <h4>Popular Categories</h4>
+                    <ul class="footer-categories">
+                        <?php foreach ($footer_categories as $category): ?>
+                            <li><a href="category.php?slug=<?php echo urlencode($category['slug']); ?>"><?php echo htmlspecialchars($category['name']); ?></a></li>
                         <?php endforeach; ?>
                     </ul>
-                    <?php if (count($footer_tags) >= 10): ?>
-                        <a href="#" class="see-more" data-type="tags">See More</a>
+                    <?php if (count($footer_categories) >= 10): ?>
+                        <a href="#" class="see-more" data-type="categories">See More</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -145,7 +144,18 @@ footer {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    align-items: center;
+}
+
+@media (min-width: 992px) {
+    .footer-nav {
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 991px) {
+    .footer-nav {
+        align-items: center;
+    }
 }
 
 .footer-nav li a {
@@ -184,6 +194,32 @@ footer {
     text-align: center;
 }
 
+@media (min-width: 992px) {
+    .col-lg-4:first-child .footer-section {
+        text-align: left;
+        padding-left: 130px;
+    }
+    
+    .col-lg-4:first-child .footer-section h4::after,
+    .col-lg-4:nth-child(2) .footer-section h4::after,
+    .col-lg-4:nth-child(3) .footer-section h4::after {
+        left: 0;
+        transform: none;
+    }
+
+    .col-lg-4:nth-child(2) .footer-section {
+        text-align: left;
+    }
+
+    .col-lg-4:nth-child(3) .footer-section {
+        text-align: left;
+    }
+
+    .col-lg-4:nth-child(2) .footer-categories {
+        justify-content: flex-start;
+    }
+}
+
 .footer-section h4 {
     color: #fff;
     font-size: 22px;
@@ -205,8 +241,8 @@ footer {
     transform: translateX(-50%);
 }
 
-/* Tags Section */
-.footer-tags {
+/* Categories Section */
+.footer-categories {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -216,7 +252,7 @@ footer {
     justify-content: center;
 }
 
-.footer-tags li a {
+.footer-categories li a {
     display: inline-block;
     padding: 6px 12px;
     background: rgba(255, 255, 255, 0.1);
@@ -227,7 +263,7 @@ footer {
     transition: all 0.3s ease;
 }
 
-.footer-tags li a:hover {
+.footer-categories li a:hover {
     background: #0d47a1;
     color: #fff;
     transform: translateY(-2px);
@@ -345,7 +381,7 @@ footer {
         /* Remove this since it's now handled in the main styles */
     }
 
-    .footer-tags {
+    .footer-categories {
         /* Remove this since it's now handled in the main styles */
     }
 
@@ -397,7 +433,7 @@ footer {
         padding: 15px;
     }
 
-    .footer-tags li a {
+    .footer-categories li a {
         padding: 4px 10px;
         font-size: 13px;
     }

@@ -304,7 +304,8 @@ error_log("Category Data after header: " . print_r($current_category, true));
 
         .category-header {
             text-align: center;
-            padding: 150px 0px;
+            padding-top: 130px;
+            padding-bottom: 30px;
             background: linear-gradient(to right, #f8f9fa, #f0f2f5);
             border-bottom: 1px solid #eee;
         }
@@ -379,10 +380,6 @@ error_log("Category Data after header: " . print_r($current_category, true));
             .blog-grid {
                 grid-template-columns: 1fr;
                 padding: 15px;
-            }
-
-            .category-header {
-                padding: 130px 0px;
             }
 
             .category-header h1 {

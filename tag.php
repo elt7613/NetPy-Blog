@@ -299,7 +299,8 @@ $categories = getAllCategories();
 
         .tag-header {
             text-align: center;
-            padding: 150px 0px;
+            padding-top: 130px;
+            padding-bottom: 30px;
             background: linear-gradient(to right, #f8f9fa, #f0f2f5);
             border-bottom: 1px solid #eee;
         }
@@ -392,10 +393,6 @@ $categories = getAllCategories();
             .load-more, .show-less {
                 width: 150px;
                 font-size: 1rem;
-            }
-
-            .tag-header {
-                padding: 130px 0px;
             }
 
             .tag-header h1 {
