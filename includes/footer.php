@@ -1,20 +1,4 @@
 <?php
-// Get categories with post count - Limited to 10 for footer
-$footer_categories_sql = "SELECT c.*, COUNT(p.id) as post_count 
-                  FROM categories c 
-                  LEFT JOIN posts p ON c.id = p.category_id 
-                  AND p.status = 'published' 
-                  AND p.deleted_at IS NULL 
-                  AND p.is_active = 1
-                  WHERE c.deleted_at IS NULL 
-                  AND c.is_active = 1
-                  GROUP BY c.id 
-                  HAVING post_count > 0
-                  ORDER BY c.name
-                  LIMIT 10";
-$footer_categories_result = $conn->query($footer_categories_sql);
-$footer_categories = $footer_categories_result ? $footer_categories_result->fetch_all(MYSQLI_ASSOC) : [];
-
 // Get tags for footer - Limited to 10
 $footer_tags_sql = "SELECT t.*, COUNT(DISTINCT pt.post_id) as post_count 
              FROM tags t 
@@ -31,30 +15,50 @@ $footer_tags_sql = "SELECT t.*, COUNT(DISTINCT pt.post_id) as post_count
              LIMIT 10";
 $footer_tags_result = $conn->query($footer_tags_sql);
 $footer_tags = $footer_tags_result ? $footer_tags_result->fetch_all(MYSQLI_ASSOC) : [];
+
+// Determine settings link based on user role
+$settings_link = 'login.php';
+if (isset($_SESSION['user_id'])) {
+    $user_role = $_SESSION['user_role'] ?? '';
+    
+    // Get current path to determine if we're in admin/author directory
+    $current_path = $_SERVER['PHP_SELF'];
+    $is_admin_page = strpos($current_path, '/admin/') !== false;
+    $is_author_page = strpos($current_path, '/author/') !== false;
+    $base_url = ($is_admin_page || $is_author_page) ? '../' : '';
+    
+    // Set the settings link with the correct base URL
+    $settings_link = $base_url . 'user-settings.php';
+    
+    // If not logged in, use login page
+    if (!isset($_SESSION['user_id'])) {
+        $settings_link = $base_url . 'login.php';
+    }
+}
 ?>
 
 <footer>
     <div class="container">
         <div class="row">
-            <!-- Categories Column -->
-            <div class="col-lg-4 col-6">
+            <!-- Navigation Links -->
+            <div class="col-lg-4 col-md-6">
                 <div class="footer-section">
-                    <h4>Categories</h4>
-                    <ul class="footer-categories">
-                        <?php foreach ($footer_categories as $category): ?>
-                            <li><a href="category.php?slug=<?php echo urlencode($category['slug']); ?>"><?php echo htmlspecialchars($category['name']); ?></a></li>
-                        <?php endforeach; ?>
+                    <h4>Quick Links</h4>
+                    <ul class="footer-nav">
+                        <li><a href="home.php">Home</a></li>
+                        <li><a href="<?php echo $settings_link; ?>"><?php echo isset($_SESSION['user_id']) ? 'Settings' : 'Login'; ?></a></li>
+                        <li><a href="about.php">About Us</a></li>
+                        <li><a href="contact.php">Contact</a></li>
+                        <li><a href="privacy-policy.php">Privacy Policy</a></li>
+                        <li><a href="terms-conditions.php">Terms & Conditions</a></li>
                     </ul>
-                    <?php if (count($footer_categories) >= 10): ?>
-                        <a href="#" class="see-more" data-type="categories">See More</a>
-                    <?php endif; ?>
                 </div>
             </div>
             
             <!-- Tags Column -->
-            <div class="col-lg-4 col-6">
+            <div class="col-lg-4 col-md-6">
                 <div class="footer-section">
-                    <h4>Tags</h4>
+                    <h4>Popular Tags</h4>
                     <ul class="footer-tags">
                         <?php foreach ($footer_tags as $tag): ?>
                             <li><a href="tag.php?slug=<?php echo urlencode($tag['slug']); ?>"><?php echo htmlspecialchars($tag['name']); ?></a></li>
@@ -66,16 +70,16 @@ $footer_tags = $footer_tags_result ? $footer_tags_result->fetch_all(MYSQLI_ASSOC
                 </div>
             </div>
             
-            <!-- Social Media Column -->
-            <div class="col-lg-4 col-12">
+            <!-- Newsletter & Social Column -->
+            <div class="col-lg-4 col-md-12">
                 <div class="footer-section social-section">
-                    <h4>Connect With Us</h4>
+                    <h4>Stay Connected</h4>
                     <!-- Newsletter Form -->
                     <div class="newsletter-section">
                         <h5>Subscribe to Newsletter</h5>
                         <div id="footer-newsletter-message" class="alert" style="display: none;"></div>
                         <form id="footer-newsletter-form" class="newsletter-form">
-                            <div class="newsletter-form-content">
+                            <div class="newsletter-form-content" style="position: relative; margin-top: 10px;">
                                 <input type="email" name="email" class="form-control" placeholder="Enter your email" required>
                                 <button type="submit" class="btn btn-primary">
                                     <span class="button-text">Subscribe</span>
@@ -87,12 +91,14 @@ $footer_tags = $footer_tags_result ? $footer_tags_result->fetch_all(MYSQLI_ASSOC
                         </form>
                     </div>
 
-                    <ul class="social-icons">
-                        <li><a href="https://www.instagram.com/netpykidz" target="_blank"><i class="fab fa-instagram"></i></a></li>
-                        <li><a href="https://x.com/netpytech" target="_blank"><i class="fab fa-x-twitter"></i></a></li>
-                        <li><a href="https://whatsapp.com/channel/0029VazDKGL6xCSNuKAtnp18" target="_blank"><i class="fab fa-whatsapp"></i></a></li>
-                        <li><a href="https://www.linkedin.com/company/netpy-tech" target="_blank"><i class="fab fa-linkedin"></i></a></li>
-                    </ul>
+                    <div class="social-media-section">
+                        <div class="social-icons">
+                            <a href="https://www.instagram.com/netpykidz" target="_blank"><i class="fab fa-instagram"></i></a>
+                            <a href="https://x.com/netpytech" target="_blank"><i class="fab fa-x-twitter"></i></a>
+                            <a href="https://whatsapp.com/channel/0029VazDKGL6xCSNuKAtnp18" target="_blank"><i class="fab fa-whatsapp"></i></a>
+                            <a href="https://www.linkedin.com/company/netpy-tech" target="_blank"><i class="fab fa-linkedin"></i></a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -124,238 +130,325 @@ $footer_tags = $footer_tags_result ? $footer_tags_result->fetch_all(MYSQLI_ASSOC
 </div>
 
 <style>
-/* Social section styling */
-.social-section {
-    text-align: center;
-    border: none;
-}
-
-.social-section:after,
-.social-section:before {
-    display: none;
-}
-
-/* Newsletter section styling */
-.newsletter-section {
-    margin: 20px 0;
-    padding: 25px;
-    border-radius: 15px;
+/* Updated Footer Styles */
+footer {
     background: #1a1f2b;
-    border: none;
-}
-
-.newsletter-section:after,
-.newsletter-section:before {
-    display: none;
-}
-
-/* Responsive adjustments */
-@media (max-width: 991px) {
-    .social-section {
-        margin-top: 20px;
-        padding-top: 20px;
-        border: none;
-    }
-
-    .footer-section h4 {
-        text-align: center !important;
-        margin-bottom: 20px;
-    }
-
-    .footer-categories, 
-    .footer-tags {
-        text-align: center !important;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .footer-categories li, 
-    .footer-tags li {
-        text-align: center !important;
-        width: 100%;
-        display: flex;
-        justify-content: center;
-    }
-
-    .footer-categories a, 
-    .footer-tags a {
-        text-align: center !important;
-        display: inline-block;
-        padding: 5px 0;
-        width: auto;
-    }
-
-    .see-more {
-        text-align: center !important;
-        margin: 15px auto 0;
-        display: block;
-        width: 100%;
-    }
-}
-
-@media (max-width: 576px) {
-    .newsletter-form-content {
-        gap: 12px;
-    }
-    
-    .newsletter-form input,
-    .newsletter-form button {
-        padding: 12px 20px;
-    }
-
-    .footer-section h4 {
-        font-size: 20px;
-    }
-    
-    .footer-categories a, 
-    .footer-tags a {
-        font-size: 15px;
-    }
-}
-
-/* Footer section general */
-.footer-section {
-    margin-bottom: 20px;
-    border: none;
-}
-
-.footer-section:after,
-.footer-section:before {
-    display: none;
-}
-
-.footer-section h4 {
+    padding: 60px 0 0;
     color: #fff;
-    margin-bottom: 12px;
-    font-size: 22px;
-    font-weight: 600;
-    text-align: left;
 }
 
-.footer-categories, .footer-tags {
+/* Footer Navigation Styles */
+.footer-nav {
     list-style: none;
     padding: 0;
     margin: 0;
-    min-height: 150px;
-    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
 }
 
-.footer-categories li, .footer-tags li {
-    margin-bottom: 8px;
-    text-align: left;
-}
-
-.footer-categories a, .footer-tags a {
+.footer-nav li a {
     color: #ccc;
     text-decoration: none;
     font-size: 16px;
     transition: color 0.3s ease;
-    display: block;
-    padding: 2px 0;
-    line-height: 1.3;
-    text-align: left;
+    display: inline-block;
+    position: relative;
 }
 
-.footer-categories a:hover, .footer-tags a:hover {
+.footer-nav li a:hover {
     color: #0d47a1;
+    transform: translateX(5px);
 }
 
-.see-more {
-    display: block;
-    color: #0d47a1;
+.footer-nav li a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -2px;
+    left: 0;
+    background-color: #0d47a1;
+    transition: width 0.3s ease;
+}
+
+.footer-nav li a:hover::after {
+    width: 100%;
+}
+
+/* Footer Section Styles */
+.footer-section {
+    margin-bottom: 30px;
+    padding: 0 15px;
+    text-align: center;
+}
+
+.footer-section h4 {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    position: relative;
+    padding-bottom: 10px;
+    display: inline-block;
+}
+
+.footer-section h4::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 50px;
+    height: 2px;
+    background: #0d47a1;
+    transform: translateX(-50%);
+}
+
+/* Tags Section */
+.footer-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    justify-content: center;
+}
+
+.footer-tags li a {
+    display: inline-block;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    color: #ccc;
+    font-size: 14px;
     text-decoration: none;
-    font-size: 16px;
-    margin-top: 15px;
-    text-align: left;
-    width: fit-content;
+    transition: all 0.3s ease;
 }
 
-.see-more:hover {
-    text-decoration: underline;
+.footer-tags li a:hover {
+    background: #0d47a1;
+    color: #fff;
+    transform: translateY(-2px);
 }
 
-/* Social section styling */
+/* Newsletter Section */
+.newsletter-section {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 25px;
+    border-radius: 15px;
+    margin-bottom: 20px;
+    border: none;
+}
+
+.newsletter-form-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.newsletter-form input {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    color: #fff;
+}
+
+.newsletter-form button {
+    background: #0d47a1;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+}
+
+.newsletter-form button:hover {
+    background: #1565c0;
+    transform: translateY(-2px);
+}
+
+/* Social Media Section */
+.social-media-section {
+    margin: 20px 0;
+}
+
 .social-icons {
     display: flex;
     justify-content: center;
-    gap: 15px;
-    margin: 25px 0;
-    padding: 0 !important;
-    list-style: none;
-    border: none !important;
-    border-bottom: none !important;
-}
-
-/* Override the main CSS file's social icons styles */
-footer ul.social-icons {
-    padding-bottom: 0 !important;
-    margin-bottom: 25px !important;
-    border: none !important;
-    border-bottom: none !important;
-}
-
-.social-icons li {
+    gap: 20px;
     margin: 0;
     padding: 0;
-    border: none;
-    display: flex;
-}
-
-.social-icons li:after,
-.social-icons li:before {
-    display: none;
 }
 
 .social-icons a {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 35px;
-    height: 35px;
-    color: #ccc;
-    text-decoration: none;
-    font-size: 18px;
-    transition: all 0.3s ease;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-}
-
-.social-icons a:after,
-.social-icons a:before {
-    display: none;
-}
-
-.social-icons i {
-    line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: #fff;
+    font-size: 18px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    border: none;
 }
 
 .social-icons a:hover {
-    color: #fff;
     background: #0d47a1;
     transform: translateY(-3px);
+    color: #fff;
+}
+
+/* Remove any potential borders or lines */
+.social-section {
+    border: none;
+}
+
+.social-section::before,
+.social-section::after {
+    display: none;
+}
+
+.social-media-section::before,
+.social-media-section::after {
+    display: none;
+}
+
+/* Copyright Section */
+.copyright-section {
+    margin-top: 40px;
+    padding: 20px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+}
+
+.copyright-text {
+    color: #ccc;
+    font-size: 14px;
+}
+
+/* Responsive Design */
+@media (max-width: 991px) {
+    .footer-section {
+        margin-bottom: 40px;
+    }
+
+    .footer-section h4::after {
+        /* Remove this since it's now handled in the main styles */
+    }
+
+    .footer-nav {
+        /* Remove this since it's now handled in the main styles */
+    }
+
+    .footer-tags {
+        /* Remove this since it's now handled in the main styles */
+    }
+
+    .newsletter-section {
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+@media (max-width: 767px) {
+    footer {
+        padding: 40px 0 0;
+    }
+
+    .footer-section {
+        margin-bottom: 30px;
+    }
+
+    .footer-nav li a {
+        font-size: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .footer-section h4 {
+        font-size: 20px;
+    }
+
+    .newsletter-form input,
+    .newsletter-form button {
+        font-size: 14px;
+        padding: 10px 15px;
+    }
+
+    .social-icons a {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 320px) {
+    .footer-section {
+        padding: 0 10px;
+    }
+
+    .newsletter-section {
+        padding: 15px;
+    }
+
+    .footer-tags li a {
+        padding: 4px 10px;
+        font-size: 13px;
+    }
 }
 
 /* Modal styling */
 #seeMoreModal .modal-content {
-    background: #fff;
-    border-radius: 8px;
+    background: #1a1f2b;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 #seeMoreModal .modal-header {
-    border-bottom: 1px solid #dee2e6;
-    padding: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 20px;
+}
+
+#seeMoreModal .modal-title {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+#seeMoreModal .btn-close {
+    color: #fff;
+    opacity: 0.8;
+    filter: invert(1) grayscale(100%) brightness(200%);
 }
 
 #seeMoreModal .modal-body {
-    padding: 1rem;
+    padding: 20px;
     max-height: 400px;
     overflow-y: auto;
+}
+
+#seeMoreModal .modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+#seeMoreModal .modal-body::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+#seeMoreModal .modal-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+#seeMoreModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 #modalContent ul {
@@ -364,146 +457,54 @@ footer ul.social-icons {
     margin: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 12px;
+}
+
+#modalContent ul li {
+    margin: 0;
 }
 
 #modalContent ul li a {
     display: inline-block;
-    padding: 5px 12px;
-    background: #f8f9fa;
-    border-radius: 20px;
-    color: #666;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 25px;
+    color: #fff;
     text-decoration: none;
-    font-size: 14px;
+    font-size: 15px;
     transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 #modalContent ul li a:hover {
     background: #0d47a1;
     color: #fff;
-}
-
-/* Updated Newsletter Form Styling */
-.newsletter-section h5 {
-    color: #fff;
-    font-size: 1rem;
-    margin-bottom: 20px;
-    text-align: center;
-    font-weight: 500;
-}
-
-.newsletter-form-content {
-    display: flex;
-    flex-direction: column;
-    gap: 0px;
-}
-
-.newsletter-form input {
-    background: #2a2f3b;
-    border: none;
-    color: #fff;
-    padding: 20px 20px;
-    font-size: 15px;
-    width: 100%;
-    outline: none;
-    border-radius: 25px;
-}
-
-.newsletter-form input::placeholder {
-    color: rgba(255, 255, 255, 0.6);
-}
-
-.newsletter-form input:focus {
-    background: #2f3545;
-    box-shadow: none;
-    color: #fff;
-}
-
-.newsletter-form button {
-    position: relative;
-    margin-top: -10px;
-    background: #0d47a1;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 25px;
-    color: #fff;
-    font-size: 15px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    width: 100%;
-}
-
-.newsletter-form button:hover {
-    background: #1565c0;
-    transform: translateY(-1px);
-}
-
-.newsletter-form .loading-state {
-    display: none;
-}
-
-#footer-newsletter-message {
-    font-size: 14px;
-    padding: 10px;
-    margin: 10px 0;
-    border-radius: 8px;
-    text-align: center;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-#footer-newsletter-message.alert-success {
-    background: rgba(46, 125, 50, 0.2);
-    border-color: rgba(46, 125, 50, 0.3);
-    color: #81c784;
-}
-
-#footer-newsletter-message.alert-danger {
-    background: rgba(198, 40, 40, 0.2);
-    border-color: rgba(198, 40, 40, 0.3);
-    color: #e57373;
-}
-
-#footer-newsletter-message.alert-info {
-    background: rgba(2, 136, 209, 0.2);
-    border-color: rgba(2, 136, 209, 0.3);
-    color: #4fc3f7;
+    transform: translateY(-2px);
+    border-color: #0d47a1;
 }
 
 @media (max-width: 576px) {
-    .newsletter-form-content {
-        gap: 12px;
+    #seeMoreModal .modal-content {
+        margin: 10px;
+        border-radius: 12px;
     }
     
-    .newsletter-form input,
-    .newsletter-form button {
-        padding: 12px 20px;
+    #seeMoreModal .modal-header {
+        padding: 15px;
     }
-}
-
-/* Social section specific styles */
-.social-section h4 {
-    text-align: center;
-}
-
-/* Updated Copyright Section */
-.copyright-section {
-    margin-top: 30px;
-    padding: 20px 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    width: 100%;
-}
-
-.copyright-text {
-    margin: 0;
-    color: #ccc;
-    font-size: 16px;
-    text-align: center;
-}
-
-.copyright-text p {
-    margin: 0;
-    padding: 0;
+    
+    #seeMoreModal .modal-body {
+        padding: 15px;
+    }
+    
+    #modalContent ul {
+        gap: 8px;
+    }
+    
+    #modalContent ul li a {
+        padding: 6px 12px;
+        font-size: 14px;
+    }
 }
 </style>
 

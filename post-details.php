@@ -845,6 +845,184 @@ $categories = getAllCategories();
             border-color: #e67730;
         }
 
+        /* Post content readability improvements */
+        .post-content {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #333333;
+            max-width: 100%;
+            margin: 30px 0;
+        }
+
+        .post-content p {
+            margin-bottom: 1.5em;
+            font-family: 'Roboto', sans-serif;
+            font-weight: 400;
+        }
+
+        .post-content h1, 
+        .post-content h2, 
+        .post-content h3, 
+        .post-content h4, 
+        .post-content h5, 
+        .post-content h6 {
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+            color: #1a1a1a;
+            line-height: 1.4;
+        }
+
+        .post-content img {
+            max-width: 100%;
+            height: auto;
+            margin: 2em 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .post-content blockquote {
+            margin: 2em 0;
+            padding: 1em 2em;
+            border-left: 4px solid #f48840;
+            background-color: #f9f9f9;
+            font-style: italic;
+            color: #555;
+        }
+
+        .post-content ul,
+        .post-content ol {
+            margin: 1.5em 0;
+            padding-left: 2em;
+        }
+
+        .post-content li {
+            margin-bottom: 0.5em;
+            line-height: 1.6;
+        }
+
+        .post-content code {
+            background-color: #f5f5f5;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .post-content pre {
+            background-color: #f5f5f5;
+            padding: 1.5em;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 1.5em 0;
+        }
+
+        .blog-post .down-content {
+            padding: 40px;
+            background: #fff;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .blog-post .blog-thumb {
+            margin-bottom: 0;
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
+        }
+
+        .blog-post .blog-thumb img {
+            width: 100%;
+            height: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .blog-post .down-content span {
+            font-size: 18px;
+            font-weight: 500;
+            color: #f48840;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        .post-info {
+            margin: 15px 0 25px 0;
+        }
+
+        .post-info li {
+            font-size: 16px;
+        }
+
+        .post-info li a {
+            font-weight: 500;
+        }
+
+        /* Improve readability on mobile */
+        @media (max-width: 768px) {
+            .post-content {
+                font-size: 16px;
+                line-height: 1.7;
+            }
+
+            .blog-post .down-content {
+                padding: 25px;
+            }
+
+            .post-content blockquote {
+                padding: 1em;
+                margin: 1.5em 0;
+            }
+        }
+
+        /* Add smooth transitions */
+        .blog-post {
+            transition: all 0.3s ease;
+        }
+
+        .blog-post:hover .blog-thumb img {
+            transform: scale(1.02);
+        }
+
+        /* Improve code block readability */
+        .post-content pre code {
+            display: block;
+            line-height: 1.6;
+            tab-size: 4;
+        }
+
+        /* Add style for links within post content */
+        .post-content a {
+            color: #f48840;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.3s ease;
+        }
+
+        .post-content a:hover {
+            border-bottom-color: #f48840;
+        }
+
+        /* Add style for tables if present in post content */
+        .post-content table {
+            width: 100%;
+            margin: 2em 0;
+            border-collapse: collapse;
+        }
+
+        .post-content th,
+        .post-content td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .post-content th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+
+        .post-content tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
     </style>
 </head>
 
@@ -883,7 +1061,7 @@ $categories = getAllCategories();
     </div>
     
     <section class="blog-posts grid-system">
-        <div class="container">
+        <div class="container" style="max-width: 1700px;">
             <div class="row">
                 <div class="col-lg-8">
                     <div class="all-blog-posts">
