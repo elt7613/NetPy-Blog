@@ -237,6 +237,93 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
         .profile-dropdown.show .profile-dropdown-menu {
             display: block;
         }
+
+        .navbar-nav .nav-item .nav-link {
+            position: relative;
+            transition: color 0.3s ease;
+        }
+
+        .navbar-nav .nav-item .nav-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -2px;
+            left: 0;
+            background-color: #0d47cc;
+            transition: width 0.3s ease;
+        }
+
+        .navbar-nav .nav-item .nav-link:hover::after {
+            width: 100%;
+        }
+
+        .navbar-nav .nav-item .nav-link:hover {
+            color: #0d47cc;
+            transform: translateX(5px);
+        }
+
+        /* Prevent underline effect on profile image */
+        .profile-dropdown .nav-link::after {
+            display: none;
+        }
+
+        /* Login/Signup Button Styles */
+        .navbar-nav .nav-item .login-btn,
+        .navbar .navbar-nav .nav-item .login-btn {
+            background-color: #0d47cc !important;
+            color: #fff !important;
+            padding: 8px 20px !important;
+            border-radius: 25px !important;
+            transition: all 0.3s ease !important;
+            border: 2px solid #0d47cc !important;
+            text-align: center !important;
+            margin: 10px 0 !important;
+            display: inline-block !important;
+            transform: none !important;
+            position: relative !important;
+            top: -15px !important;
+        }
+
+        .navbar-nav .nav-item .login-btn:hover,
+        .navbar-nav .nav-item .login-btn:focus,
+        .navbar-nav .nav-item .login-btn:active,
+        .navbar .navbar-nav .nav-item .login-btn:hover,
+        .navbar .navbar-nav .nav-item .login-btn:focus,
+        .navbar .navbar-nav .nav-item .login-btn:active {
+            background-color: transparent !important;
+            color: #0d47cc !important;
+            transform: translateY(-2px) !important;
+        }
+
+        /* Remove underline effect for login button */
+        .navbar-nav .nav-item .login-btn::after,
+        .navbar .navbar-nav .nav-item .login-btn::after {
+            display: none !important;
+        }
+
+        /* Ensure mobile styles don't override */
+        @media (max-width: 991px) {
+            .navbar-nav .nav-item .login-btn,
+            .navbar .navbar-nav .nav-item .login-btn {
+                background-color: #0d47cc !important;
+                color: #fff !important;
+                margin: 10px 15px !important;
+                width: auto !important;
+                display: inline-block !important;
+                top: 0 !important; /* Reset top position in mobile view */
+            }
+            
+            .navbar-nav .nav-item .login-btn:hover,
+            .navbar-nav .nav-item .login-btn:focus,
+            .navbar-nav .nav-item .login-btn:active,
+            .navbar .navbar-nav .nav-item .login-btn:hover,
+            .navbar .navbar-nav .nav-item .login-btn:focus,
+            .navbar .navbar-nav .nav-item .login-btn:active {
+                background-color: transparent !important;
+                color: #0d47cc !important;
+            }
+        }
     </style>
 </head>
 
@@ -259,6 +346,9 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                 </button>
                 <div class="collapse navbar-collapse" id="navbarResponsive">
                     <ul class="navbar-nav ml-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?php echo $base_url; ?>index.php">Home</a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link" href="<?php echo $base_url; ?>home.php">Blogs</a>
                         </li>
@@ -436,7 +526,7 @@ $nav_categories = $nav_categories_result ? $nav_categories_result->fetch_all(MYS
                             <?php endif; ?>
                         <?php else: ?>
                             <li class="nav-item">
-                                <a class="nav-link" href="<?php echo $base_url; ?>login.php">Login/Signup</a>
+                                <a class="nav-link login-btn" href="<?php echo $base_url; ?>login.php">Login/Signup</a>
                             </li>
                         <?php endif; ?>
                     </ul>

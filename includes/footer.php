@@ -46,10 +46,10 @@ if (isset($_SESSION['user_id'])) {
                     <ul class="footer-nav">
                         <li><a href="home.php">Home</a></li>
                         <li><a href="<?php echo $settings_link; ?>"><?php echo isset($_SESSION['user_id']) ? 'Settings' : 'Login'; ?></a></li>
-                        <li><a href="about.php">About Us</a></li>
-                        <li><a href="contact.php">Contact</a></li>
-                        <li><a href="privacy-policy.php">Privacy Policy</a></li>
-                        <li><a href="terms-conditions.php">Terms & Conditions</a></li>
+                        <li><a href="https://netpy.in/aboutus.php" target="_blank">About Us</a></li>
+                        <li><a href="https://netpy.in/contact.php" target="_blank">Contact</a></li>
+                        <li><a href="https://netpy.in/privacy_statement.php" target="_blank">Privacy Policy</a></li>
+                        <li><a href="https://netpy.in/terms_condition.php" target="_blank">Terms & Conditions</a></li>
                     </ul>
                 </div>
             </div>
