@@ -1061,7 +1061,7 @@ $categories = getAllCategories();
     </div>
     
     <section class="blog-posts grid-system">
-        <div class="container" style="max-width: 1700px;">
+        <div class="container" style="max-width: 1450px;">
             <div class="row">
                 <div class="col-lg-8">
                     <div class="all-blog-posts">
